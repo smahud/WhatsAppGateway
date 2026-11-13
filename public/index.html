@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAGW PRO Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+    <!-- Background Animation Elements -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+
+    <div class="dashboard-container glass-panel">
+        
+        <aside class="sidebar">
+            <div class="brand">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='48' fill='url(%23g)'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2300e6ff'/%3E%3Cstop offset='100%25' stop-color='%239600ff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M30,45 L40,65 L50,45 L60,65 L70,45' fill='none' stroke='white' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" width="28" height="28" style="vertical-align:middle; margin-right:5px;" alt="Logo"> 
+                WAGW <span>PRO</span>
+                <div style="font-size:0.8rem; margin-top:5px;">
+                    <a href="#" onclick="setLang('en')" id="l-en" style="color:#2ecc71; text-decoration:none;">EN</a> | 
+                    <a href="#" onclick="setLang('id')" id="l-id" style="color:#aaa; text-decoration:none;">ID</a>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-target="status-page"><i class="fa-solid fa-server"></i> <span data-t="nav_status">Status</span></a>
+                <a href="#" class="nav-item" data-target="config-page"><i class="fa-solid fa-gear"></i> <span data-t="nav_config">Config</span></a>
+                <a href="#" class="nav-item" data-target="send-page"><i class="fa-solid fa-paper-plane"></i> <span data-t="nav_send">Send Message</span></a>
+                <a href="#" class="nav-item" data-target="inbox-page"><i class="fa-solid fa-inbox"></i> <span data-t="nav_inbox">Inbox</span></a>
+                <a href="#" class="nav-item" data-target="outbox-page"><i class="fa-solid fa-box-open"></i> <span data-t="nav_outbox">Outbox</span></a>
+                <a href="#" class="nav-item" data-target="sent-page"><i class="fa-solid fa-check-double"></i> <span data-t="nav_sent">Sent</span></a>
+                <a href="#" class="nav-item" data-target="tools-page"><i class="fa-solid fa-wrench"></i> <span data-t="nav_tools">Tools</span></a>
+                <a href="#" class="nav-item" data-target="doc-page"><i class="fa-solid fa-book"></i> <span>Tutorial / API</span></a>
+                <a href="#" class="nav-item" data-target="dev-page"><i class="fa-solid fa-code"></i> <span>Developer Info</span></a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            
+            <!-- STATUS PAGE -->
+            <section id="status-page" class="page-view active">
+                <header class="d-flex justify-between align-items-center">
+                    <div>
+                        <h2 data-t="hs_status">System Status</h2>
+                        <p data-t="p_status">Monitor your WhatsApp connection state.</p>
+                    </div>
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn btn-success" onclick="controlWA('start')" style="padding:5px 10px; font-size:0.8rem;"><i class="fa-solid fa-play"></i> Start WA</button>
+                        <button class="btn btn-danger" onclick="controlWA('stop')" style="padding:5px 10px; font-size:0.8rem; background:var(--danger);"><i class="fa-solid fa-stop"></i> Stop</button>
+                        <button class="btn btn-warning" onclick="controlWA('restart')" style="padding:5px 10px; font-size:0.8rem; background:#f39c12; color:#fff; border:none;"><i class="fa-solid fa-rotate-right"></i> Restart WA</button>
+                    </div>
+                </header>
+                <div class="status-card glass-panel-inner">
+                    <div class="status-indicator" id="conn-indicator">
+                        <div class="dot disconnected"></div>
+                        <span id="conn-text">Checking...</span>
+                    </div>
+                    <div id="qr-container" class="qr-box">
+                        <p>No QR Code to display</p>
+                    </div>
+                    <div style="display:flex; justify-content:center; gap:10px; margin-top:20px;">
+                        <button class="btn btn-primary" onclick="loadStatus()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                        <button class="btn btn-danger" onclick="logoutSession()"><i class="fa-solid fa-power-off"></i> <span data-t="btn_logout">Logout WA (Clear Session)</span></button>
+                    </div>
+                </div>
+                
+                <div class="glass-panel-inner mt-4" style="margin-top:20px;">
+                    <h4 style="margin-bottom:15px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:10px;">
+                        <i class="fa-solid fa-gears"></i> Engine Maintenance
+                        <span id="app-ver-badge" style="float:right; font-size:0.8rem; background:rgba(0,230,255,0.2); color:#00e6ff; padding:2px 8px; border-radius:12px; font-family:monospace;">Ver -</span>
+                    </h4>
+                    
+                    <div style="display:flex; gap:15px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:250px; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border:1px solid #333;">
+                            <h5 style="margin-top:0"><i class="fa-brands fa-whatsapp"></i> WhatsApp Core (Baileys)</h5>
+                            <p style="font-size:0.85rem; color:#aaa; margin-bottom:15px;">Perbarui library WhatsApp secara langsung jika perangkat gagal log in karena versi server Meta berubah.</p>
+                            <button class="btn btn-primary" id="btn-update" onclick="updateBaileys()" style="width:100%;"><i class="fa-solid fa-cloud-arrow-down"></i> Update Baileys</button>
+                        </div>
+                        
+                        <div style="flex:1; min-width:250px; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px; border:1px solid #333;">
+                            <h5 style="margin-top:0"><i class="fa-solid fa-rocket"></i> WAGW PRO System Update</h5>
+                            <p style="font-size:0.85rem; color:#aaa; margin-bottom:15px;">Periksa pembaruan Bug dan Fitur Baru OTA (Over-The-Air) langsung dari Server Developer WAGW.</p>
+                            <button class="btn btn-primary" id="btn-ota-check" onclick="checkAppUpdate()" style="width:100%; background:linear-gradient(45deg, #9b59b6, #8e44ad); border:none;"><i class="fa-solid fa-rotate"></i> Check For Updates</button>
+                            <div id="ota-result-box" style="margin-top:15px; display:none; font-size:0.85rem; background:rgba(0,0,0,0.3); padding:10px; border-radius:5px; border:1px solid #444;"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CONFIG -->
+            <section id="config-page" class="page-view">
+                <header>
+                    <h2 data-t="hs_config">Configuration</h2>
+                    <p data-t="p_config">Set up database connection and system parameters.</p>
+                </header>
+                <form id="config-form" class="glass-panel-inner form-layout">
+                    <div class="form-group">
+                        <label>Database Type (sqlite, mysql, oracle, sqlserver, odbc)</label>
+                        <select id="cfg-db_type" onchange="updateDBHelp()">
+                            <option value="sqlite">SQLite (Lokal Auto - wg.sqlite)</option>
+                            <option value="mysql">MySQL</option>
+                            <option value="oracle">Oracle</option>
+                            <option value="sqlserver">SQL Server</option>
+                            <option value="odbc">ODBC / DSN</option>
+                        </select>
+                        <div id="db-help-box" style="display:none; margin-top:10px; background:rgba(0,230,255,0.1); border-left:3px solid #00e6ff; padding:10px; font-size:0.85rem; color:#aaa; border-radius:4px;"></div>
+                    </div>
+                    <div class="form-group half">
+                        <label>Database Host / Connect String (Isi dengan ConnString utuh jika ODBC)</label>
+                        <input type="text" id="cfg-host" placeholder="localhost" required>
+                    </div>
+                    <div class="form-group half">
+                        <label>Database Name</label>
+                        <input type="text" id="cfg-db" placeholder="wagw">
+                    </div>
+                    <div class="form-group half">
+                        <label>DB Username</label>
+                        <input type="text" id="cfg-user" placeholder="root">
+                    </div>
+                    <div class="form-group half">
+                        <label>DB Password</label>
+                        <input type="password" id="cfg-pass" placeholder="*****">
+                    </div>
+                    <div class="form-group">
+                        <label>Send Delay (Seconds)</label>
+                        <input type="number" id="cfg-delay" placeholder="10" required>
+                    </div>
+                    <div class="form-group half">
+                        <label>Webhook URL (Optional)</label>
+                        <input type="url" id="cfg-webhook" placeholder="http://domain.com/webhook.php">
+                    </div>
+                    <div class="form-group half">
+                        <label>Execute Bot EXE (Optional)</label>
+                        <input type="text" id="cfg-botexe" placeholder="C:\Folder\bot.exe">
+                    </div>
+                    <div style="display:flex; width:100%; gap:10px; margin-top:10px;">
+                        <button type="button" class="btn btn-secondary" style="flex:1;" onclick="testDBConnection()"><i class="fa-solid fa-plug-circle-check"></i> Test Koneksi</button>
+                        <button type="submit" class="btn btn-success" style="flex:2;"><i class="fa-solid fa-floppy-disk"></i> Save Configuration</button>
+                    </div>
+                    <div id="test-db-result" style="margin-top:10px; font-size:0.9rem; border-radius:5px;"></div>
+
+                    <div style="width:100%; border-top:1px solid rgba(255,255,255,0.1); margin-top:15px; padding-top:15px; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <h4 style="margin-bottom:3px; font-weight:500;">Pembaruan Sistem</h4>
+                            <p style="font-size:0.8rem; color:var(--text-secondary)">Mutakhirkan versi Baileys jika koneksi WhatsApp macet.</p>
+                        </div>
+                        <button type="button" class="btn btn-secondary" onclick="updateBaileys()" id="btn-update">
+                            <i class="fa-solid fa-cloud-arrow-down"></i> Update Baileys
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+
+            <!-- SEND MESSAGE -->
+            <section id="send-page" class="page-view">
+                <header>
+                    <h2 data-t="hs_send">Send Message</h2>
+                    <p data-t="p_send">Draft and send quick messages directly into the outbox.</p>
+                </header>
+                
+                <div class="glass-panel-inner" style="margin-bottom:15px; padding:10px;">
+                    <button class="btn btn-primary" onclick="toggleSendMode('single')" id="btn-tab-single">Single Send</button>
+                    <button class="btn btn-secondary" onclick="toggleSendMode('bulk')" id="btn-tab-bulk">Bulk Send (Massal)</button>
+                </div>
+
+                <!-- SINGLE SEND -->
+                <form id="send-form" class="glass-panel-inner form-layout">
+                    <div class="form-group">
+                        <label>Target Number (e.g. 628123456789)</label>
+                        <input type="text" id="send-no" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Message Content (Text or Button format)</label>
+                        <textarea id="send-text" rows="5" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Media Path (Isi dengan path lokal gambar untuk kirim gambar)</label>
+                        <input type="text" id="send-media" placeholder="C:\images\promo.jpg">
+                    </div>
+                    <div class="form-group">
+                        <label>Document Path (Isi dengan path lokal PDF/DOC untuk kirim file)</label>
+                        <input type="text" id="send-file" placeholder="C:\docs\invoice.pdf">
+                    </div>
+                    <div class="form-group" style="background:rgba(0,0,0,0.4); padding:10px; border-radius:5px; border-left:3px solid #f39c12; margin-top:10px;">
+                        <input type="checkbox" id="send-smart" value="1" style="transform:scale(1.2); margin-right:8px; cursor:pointer;">
+                        <label for="send-smart" style="display:inline; cursor:pointer;" data-t="lbl_smart"><b>Smart Send:</b> Hanya kirimkan pesan jika target dipastikan aktif/online dalam 24 jam terakhir (Mengurangi risiko diblokir spam).</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="margin-top:15px;"><i class="fa-solid fa-paper-plane"></i> Send to Outbox</button>
+                </form>
+
+                <!-- BULK SEND -->
+                <form id="bulk-send-form" class="glass-panel-inner form-layout" style="display:none;">
+                    <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:15px;"><i class="fa-solid fa-circle-info"></i> <b>Kirim Sama Rata:</b> Ketikkan nomor lurus ke bawah.<br><i class="fa-solid fa-circle-info"></i> <b>Kirim Kustom (Variabel):</b> Ketik/Paste data "Nomor | Nama | Var3 ...", gunakan variabel {1}, {2} pada pesan di bawah.</p>
+                    
+                    <div style="background:rgba(0,0,0,0.2); padding:10px; border-radius:5px; margin-bottom:15px; display:flex; gap:10px; align-items:center;">
+                        <a href="data:text/csv;charset=utf-8,Nomor,Nama,Tagihan%0A62812xxx,Budi,150.000" download="Template_Bulk.csv" class="btn btn-secondary" style="font-size:0.8rem; padding:5px 10px;"><i class="fa-solid fa-download"></i> Templat CSV</a>
+                        <label class="btn btn-info" style="font-size:0.8rem; padding:5px 10px; cursor:pointer; margin:0;"><i class="fa-solid fa-file-csv"></i> Upload CSV/Excel
+                            <input type="file" id="bulk-file" accept=".csv" style="display:none;" onchange="importCSV(event)">
+                        </label>
+                        <span style="font-size:0.8rem; color:#aaa;">Pilih file .csv untuk mengekstrak data otomatis.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Target Data (Bisa di Paste baris menyamping dari Excel)</label>
+                        <textarea id="bulk-data" rows="5" placeholder="Contoh Kustom:&#10;62812xxxx | Budi | 50.000&#10;174xxx21@lid | Anton | 13.000&#10;Contoh Sama Rata:&#10;62818xxx&#10;62813xxx" required style="font-family:monospace; background:rgba(0,0,0,0.3); border:1px solid #444; color:#fff; width:100%; border-radius:4px; padding:10px;"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Message Content (Gunakan {1}, {2} dst untuk memanggil variabel per baris target)</label>
+                        <textarea id="bulk-text" rows="4" placeholder="Halo {2}, sisa tagihan kamu sebesar Rp {3}. Harap dibayar ya!" required style="font-family:inherit;"></textarea>
+                    </div>
+                    <div class="form-group" style="background:rgba(0,0,0,0.4); padding:10px; border-radius:5px; border-left:3px solid #f39c12; margin-top:10px;">
+                        <input type="checkbox" id="bulk-smart" value="1" style="transform:scale(1.2); margin-right:8px; cursor:pointer;">
+                        <label for="bulk-smart" style="display:inline; cursor:pointer;" data-t="lbl_smart"><b>Smart Send Filter (Perhatian Jeda Loading):</b> Mengabaikan pengiriman jika target diam-diam tidak online > 24 Jam demi anti-ban.</label>
+                    </div>
+                    <button type="submit" class="btn btn-warning" style="width:100%; margin-top:15px;"><i class="fa-solid fa-paper-plane"></i> <i class="fa-solid fa-paper-plane"></i> Blast Bulk to Outbox</button>
+                </form>
+            </section>
+
+
+            <!-- INBOX -->
+            <section id="inbox-page" class="page-view">
+                <header class="d-flex justify-between align-items-center">
+                    <div>
+                        <h2 data-t="hs_inbox">Inbox Messages</h2>
+                        <p data-t="p_inbox">Live monitor of incoming messages.</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-secondary" onclick="loadInbox()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                    </div>
+                </header>
+                <div class="glass-panel-inner table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Pengirim</th>
+                                <th>Pesan</th>
+                                <th>Waktu</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inbox-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- OUTBOX -->
+            <section id="outbox-page" class="page-view">
+                 <header class="d-flex justify-between align-items-center">
+                    <div>
+                        <h2 data-t="hs_outbox">Outbox Queue</h2>
+                        <p data-t="p_outbox">Pending messages waiting to be sent.</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-danger" onclick="clearOutbox()"><i class="fa-solid fa-trash"></i> Empty</button>
+                        <button class="btn btn-secondary" onclick="loadOutbox()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                    </div>
+                </header>
+                <div class="glass-panel-inner table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th data-t="th_time">Time</th>
+                                <th data-t="th_receiver">Receiver</th>
+                                <th data-t="th_text">Text</th>
+                            </tr>
+                        </thead>
+                        <tbody id="outbox-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- SENT -->
+            <section id="sent-page" class="page-view">
+                 <header class="d-flex justify-between align-items-center">
+                    <div>
+                        <h2 data-t="hs_sent">Sent History</h2>
+                        <p data-t="p_sent">Successfully processed messages.</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-danger" onclick="clearSent()"><i class="fa-solid fa-trash"></i> Empty</button>
+                        <button class="btn btn-secondary" onclick="loadSent()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                    </div>
+                </header>
+                <div class="glass-panel-inner table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th data-t="th_time">Time</th>
+                                <th data-t="th_receiver">Receiver</th>
+                                <th data-t="th_text">Text</th>
+                                <th data-t="th_status">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sent-body"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TOOLS -->
+            <section id="tools-page" class="page-view">
+                 <header>
+                    <h2 data-t="hs_tools">WhatsApp Utilities Center</h2>
+                    <p data-t="p_tools">Extra toolkit using Baileys Library connection.</p>
+                </header>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
+                    <!-- Check Number -->
+                    <form id="check-num-form" class="glass-panel-inner form-layout">
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-user-check"></i> Bulk Number Verifier</label>
+                            <textarea id="check-no" rows="4" placeholder="Ketik nomor (satu per baris)..." required style="width:100%; border:1px solid #333; background:rgba(0,0,0,0.3); border-radius:5px; padding:10px; color:#fff; font-family:monospace;"></textarea>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Cek Register</button>
+                            <button type="button" class="btn btn-secondary" onclick="copyCheckResults()" id="btn-copy-check" style="display:none;"><i class="fa-solid fa-copy"></i> Salin</button>
+                        </div>
+                        <div id="check-result" style="margin-top:15px; padding:10px; border-radius:5px; display:none; max-height:200px; overflow-y:auto; line-height:1.6;"></div>
+                    </form>
+
+                    <!-- Last Seen -->
+                    <form id="check-last-form" class="glass-panel-inner form-layout">
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-eye"></i> Cek Status Online & Last Seen</label>
+                            <input type="text" id="last-no" placeholder="Contoh: 62812xxxx" required>
+                        </div>
+                        <button type="submit" class="btn btn-info" style="width:100%"><i class="fa-solid fa-clock"></i> Intai Status</button>
+                        <div id="last-result" style="margin-top:15px; font-size:0.9rem; color:var(--text-secondary); display:none;"></div>
+                    </form>
+                    
+                    <!-- Get Profile Pic -->
+                    <form id="check-pic-form" class="glass-panel-inner form-layout">
+                        <div class="form-group">
+                            <label><i class="fa-regular fa-image"></i> Ambil Foto Profil WA (DP)</label>
+                            <input type="text" id="pic-no" placeholder="Contoh: 62812xxxx" required>
+                        </div>
+                        <button type="submit" class="btn btn-warning" style="width:100%"><i class="fa-solid fa-camera"></i> Tarik Foto Profil</button>
+                        <div id="pic-result" style="margin-top:15px; text-align:center; display:none;"></div>
+                    </form>
+                    
+                    <!-- Get Groups -->
+                    <form id="check-group-form" class="glass-panel-inner form-layout">
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-users"></i> Daftar Grup Tergabung (Group Fetcher)</label>
+                            <p style="font-size:0.8rem; color:#aaa;">Tarik ID grup WhatsApp untuk keperluan auto/bulk mengirim ke grup.</p>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button type="submit" class="btn btn-primary" style="flex:1;"><i class="fa-solid fa-download"></i> Ambil List Grup</button>
+                            <button type="button" class="btn btn-secondary" onclick="copyGroupResults()" id="btn-copy-group" style="display:none;"><i class="fa-solid fa-copy"></i> Salin</button>
+                        </div>
+                        <div id="group-result" style="margin-top:15px; font-size:0.85rem; display:none; max-height:200px; overflow-y:auto; line-height:1.6; background:rgba(0,0,0,0.3); border:1px solid #444; padding:10px; border-radius:5px;"></div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- DOCUMENTATION MAP -->
+            <section id="doc-page" class="page-view">
+                 <header>
+                    <h2><i class="fa-solid fa-graduation-cap"></i> Cara Penggunaan (Tutorial & API)</h2>
+                    <p>Integrasikan aplikasi eksternal atau Database Anda sendiri ke dalam WAGW PRO.</p>
+                </header>
+                
+                <div class="glass-panel-inner" style="line-height:1.6; color:#ddd;">
+                    
+                    <h3 style="color:#00e6ff; border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:15px;"><i class="fa-solid fa-database"></i> 1. Pengiriman Via Tabel Database (Auto-Loop)</h3>
+                    <p>Anda bebas menggunakan DBMS apa saja (MDB, MySQL, SQL Server) asalkan terkoneksi di tab <b>Config</b>. Cukup masukkan perintah <code>INSERT</code> ke tabel <b>outbox</b>!</p>
+                    <div style="background:rgba(0,0,0,0.5); padding:10px; border-radius:5px; margin-bottom:20px; font-family:monospace; border-left:3px solid #00e6ff;">
+                        INSERT INTO outbox (wa_no, wa_text) VALUES ('62812xxx', 'Ini Pesan Uji Coba');
+                    </div>
+
+                    <h3 style="color:#2ecc71; border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:15px;"><i class="fa-solid fa-globe"></i> 2. Pengiriman Via API (CURL / HTTP Post)</h3>
+                    <p>Jika Anda mempunyai App Web (PHP, Laravel, atau Webhook), cukup tebak <i>endpoint</i> API ini, langsung masuk ke antrean!</p>
+                    <div style="background:rgba(0,0,0,0.5); padding:10px; border-radius:5px; margin-bottom:20px; font-family:monospace; border-left:3px solid #2ecc71;">
+                        <b>URL:</b> http://localhost:3000/api/send<br>
+                        <b>METHOD:</b> POST<br>
+                        <b>CONTENT-TYPE:</b> application/json<br>
+                        <b>JSON BODY:</b><br>
+                        {<br>
+                        &nbsp;&nbsp;"no": "62812xxxxx",<br>
+                        &nbsp;&nbsp;"text": "Pesan tagihan Anda..."<br>
+                        }
+                    </div>
+
+                    <h3 style="color:#9b59b6; border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:15px;"><i class="fa-solid fa-users"></i> 3. Mengirim Pesan Ke Dalam Grup WhatsApp</h3>
+                    <p>WAGW PRO mendukung pengiriman terarah ke dalam sebuah Grup secara native. Cukup gunakan Group ID ditambah akhiran <code>@g.us</code> di kolom target nomor.</p>
+                    <div style="background:rgba(0,0,0,0.5); padding:10px; border-radius:5px; margin-bottom:20px; font-family:monospace; border-left:3px solid #9b59b6;">
+                        12036304899999999@g.us<br>
+                        <i>*Gunakan fitur <b>Group Fetcher</b> di tab Tools untuk mengekstrak ID Grup yang Anda ikuti.</i>
+                    </div>
+
+                    <h3 style="color:#f1c40f; border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:15px;"><i class="fa-solid fa-bolt"></i> 3. Format Interactive & Polling Media</h3>
+                    <p>Trik rahasia Baileys: Ketik format ini ke dalam kolom <code>wa_text</code> untuk dikirim sebagai pesan menakjubkan:</p>
+                    <ul style="margin-left:20px; margin-bottom:20px;">
+                        <li><b>Kirim Polling:</b> <code>POLLVOTE!Siapa Presiden RI?~Joko Widodo~Gus Dur~BJ Habibie</code></li>
+                        <li><b>Kirim Tombol (Reply/Url/Copy):</b> <br><code>TEXTWITHBUTTON!Silakan kunjungi web~{"buttonId": "id1", "buttonText": {"displayText": "Buka Situs"}, "type": 1}</code></li>
+                        <li><b>Kirim Gambar + Teks (API):</b> Sertakan Body tambahan <code>"media": "data:image/jpeg;base64,..."</code> pada HTTP Request, atau pada kolom <code>wa_media</code>.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- DEVELOPER / CONTACT PAGE -->
+            <section id="dev-page" class="page-view">
+                 <header>
+                    <h2><i class="fa-solid fa-user-astronaut"></i> Developer Info</h2>
+                    <p>Informasi dukungan dan kontak developer.</p>
+                </header>
+                <div class="glass-panel-inner" style="line-height:1.6; color:#ddd; padding:30px;">
+                    <div style="display:flex; align-items:center; gap:15px; margin-bottom:20px; border-bottom:1px solid #444; padding-bottom:20px;">
+                        <i class="fa-solid fa-code" style="font-size:2.5rem; color:#9b59b6;"></i>
+                        <div>
+                            <h3 style="margin:0; font-size:1.5rem; color:#fff;">WAGW PRO</h3>
+                            <p style="margin:0; font-size:0.9rem; color:#aaa;">Powered by Baileys Library</p>
+                        </div>
+                    </div>
+                    
+                    <p style="margin:5px 0;"><b>Developer:</b> Hermawan Dephe</p>
+                    <p style="margin:5px 0;"><b>Kontak:</b> <a href="https://t.me/wawn1782" target="_blank" style="color:#00e6ff; text-decoration:none;"><i class="fa-brands fa-telegram"></i> t.me/wawn1782</a></p>
+
+                    <div style="background:rgba(0,0,0,0.3); padding:20px; border-radius:10px; border:1px solid #333; margin-top:25px;">
+                        <h4 style="color:#f1c40f; margin-top:0; margin-bottom:15px;"><i class="fa-solid fa-mug-hot"></i> Dukung Pengembangan WAGW</h4>
+                        <p style="font-size:0.9rem;">Jika aplikasi open-source ini membantu operasional harian Anda, Anda dapat memberikan apresiasi donasi melalui transfer bank di bawah ini untuk mendukung pembaruan fitur ke depannya:</p>
+                        
+                        <div style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
+                            <a href="https://paypal.me/wawn1782" target="_blank" class="btn btn-primary" style="display:flex; justify-content:center; align-items:center; gap:10px; margin-bottom:5px; border-radius:30px;">
+                                <i class="fa-brands fa-paypal"></i> Donate Me with PAYPAL
+                            </a>
+                            <div style="background:rgba(255,255,255,0.05); padding:10px 15px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                                <span>BCA</span>
+                                <strong style="color:#00e6ff; font-size:1.1rem; user-select:all;">3430974903</strong>
+                            </div>
+                            <div style="background:rgba(255,255,255,0.05); padding:10px 15px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                                <span>Mandiri</span>
+                                <strong style="color:#00e6ff; font-size:1.1rem; user-select:all;">1240007600886</strong>
+                            </div>
+                        </div>
+                        <p style="font-size:0.8rem; color:#aaa; margin-top:15px; margin-bottom:0;"><i class="fa-solid fa-circle-info"></i> Harap hubungi via Telegram setelah melakukan donasi.</p>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- MESSAGE DETAIL MODAL -->
+            <div id="msgModal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#1a1c23; border:1px solid #333; padding:25px; border-radius:10px; z-index:999; box-shadow:0 0 30px rgba(0,0,0,0.8); min-width:300px; max-width:80%;">
+                <h3 style="margin-top:0;" data-t="modal_title">Message Detail</h3>
+                <div id="msgModalBody" style="margin:20px 0; color:#cbd5e1; max-height:400px; overflow-y:auto; word-break:break-all; font-family:monospace; background:rgba(0,0,0,0.3); padding:10px; border-radius:5px;"></div>
+                <button class="btn btn-secondary" onclick="document.getElementById('msgModal').style.display='none'; document.getElementById('modalOverlay').style.display='none';" data-t="btn_close">Close</button>
+            </div>
+            <div id="modalOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:998;" onclick="document.getElementById('msgModal').style.display='none'; document.getElementById('modalOverlay').style.display='none';"></div>
+        </main>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
