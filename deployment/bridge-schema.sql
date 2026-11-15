@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS bridge_control (
+ id INT PRIMARY KEY, enabled BOOLEAN NOT NULL DEFAULT 0,
+ mode ENUM('mirror','whatsapp') NOT NULL DEFAULT 'whatsapp',
+ inbox_enabled BOOLEAN NOT NULL DEFAULT 0
+) ENGINE=InnoDB;
+INSERT IGNORE INTO bridge_control(id) VALUES(1);
+CREATE TABLE IF NOT EXISTS bridge_outgoing (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ source_id BIGINT NOT NULL,
+ destination VARCHAR(200) NOT NULL, message LONGTEXT,
+ scheduled_at DATETIME NULL, multipart VARCHAR(5),
+ state VARCHAR(30) NOT NULL DEFAULT 'pending',
+ wagw_id BIGINT NULL, error TEXT NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ KEY(state,scheduled_at), UNIQUE KEY(source_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS bridge_incoming (
+ source_id BIGINT PRIMARY KEY, destination_id BIGINT NULL,
+ state VARCHAR(30) NOT NULL DEFAULT 'pending', error TEXT NULL
+) ENGINE=InnoDB;

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panduan Lengkap WAGW PRO</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; padding: 20px; max-width: 900px; margin: auto; background: #f9f9f9; color: #333;}
+        h1, h2, h3 { color: #2c3e50; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        code { background: #eee; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #c0392b; }
+        pre { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 8px; overflow-x: auto; font-family: monospace; }
+        .alert { background: #dff0d8; color: #3c763d; padding: 15px; border-radius: 5px; border-left: 5px solid #3c763d;}
+        .note { background: #e8f4f8; border-left: 5px solid #2980b9; padding: 15px; margin: 15px 0;}
+        .contact-box { background: #2c3e50; color: white; padding: 20px; border-radius: 8px; text-align: center; }
+        .contact-box h3 { color: #00e6ff; margin-top: 0; }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align: center; border-bottom: 2px solid #ccc; padding-bottom:10px;">PANDUAN LENGKAP WAGW PRO</h1>
+    <p style="text-align: center;">Bot WhatsApp/Gateway yang dapat dikontrol melalui Database SQL dan Dashboard Web secara *Real-Time*, yang sanggup berjalan mandiri tanpa henti (*Background Service*).</p>
+
+    <div class="card">
+        <h2>1. Persiapan Database (MySQL, Oracle, atau SQL Server)</h2>
+        <p>Sebelum menjalankan Bot, pastikan struktur database Anda sudah di-*import*. Parameter tabel (*inbox, outbox, sent*) adalah nyawa utama jalannya program ini.</p>
+        <p>Gunakan <i>SQL Dump</i> yang telah disediakan sesuai dengan mesin Database Anda:</p>
+        <ul>
+            <li><code>Create Tables - MySQL.sql</code></li>
+            <li><code>Create Tables - Oracle.sql</code></li>
+            <li><code>Create Tables - SQLServer.sql</code></li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>2. Konfigurasi BOT Kredensial</h2>
+        <p>WAGW PRO membaca semua setting koneksinya. Anda dapat mengatur Password Database, Jenis DB (mysql/oracle/sqlserver), hingga kecepatan pengiriman pesan (*Send Delay*) semuanya langsung dari tampilan Website <strong>WAGW PRO Dashboard</strong>.</p>
+        <p><strong>Penting:</strong> Jika Anda salah memasukkan Kredensial Database, WAGW PRO akan memunculkan tulisan <em>"Disconnected / Checking"</em> di Layar Web-nya. Anda cukup pindah ke tab <strong>Config</strong>, perbaiki Password/Username DB Anda sesuai lokal PC Anda, klik <strong>Save</strong>, lalu <em>Restart</em> aplikasi.</p>
+    </div>
+
+    <div class="card">
+        <h2>3. Cara Menjalankan Aplikasi (Pilih Salah Satu)</h2>
+
+        <h3>CARA 1: Otomatis di Latar Belakang (Jalan Terus Selamanya) <span style="color:var(--success)">[Disarankan]</span></h3>
+        <p>Membuat bot Anda menjadi Windows System Service murni (Otomatis nyala setelah komputer Reboot tanpa layar hitam).</p>
+        <ul>
+            <li>Jalankan <code>Install_to_Windows_Service.bat</code> (Klik dua kali).</li>
+            <li>Jika muncul notifikasi Windows (*User Account Control*), klik <strong>Yes</strong>.</li>
+            <li>Bila sukses di-*install*, Anda sudah tidak membutuhkan Terminal / CMD lagi. <em>(Catatan: Gunakan <code>Uninstall_Windows_Service.bat</code> jika suatu hari ingin menghapus secara permanen).</em></li>
+        </ul>
+
+        <h3>CARA 2: Semi-Latar Belakang Ringan</h3>
+        <p>Menjalankan secara *invisible* sementara saat ini (hanya terhubung selama komputer belum dimatikan).</p>
+        <ul>
+            <li>Klik ganda pada <code>START.bat</code></li>
+            <li>Layar terminal akan disembunyikan menggunakan PowerShell dan Browser Web otomatis terbuka.</li>
+            <li>Untuk mematikannya kapan saja, Anda harus nge-klik rutin <code>STOP.bat</code>.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>4. Tautkan WhatsApp & Dashboard Web</h2>
+        <p>Setelah WAGW PRO dijalankan, silakan buka Browser Chrome/Edge lalu pergi ke:</p>
+        <pre style="text-align: center; font-size: 1.2rem;">http://localhost:3000</pre>
+        <p>Bila koneksi berhasil tersambung, <strong>QR Code</strong> akan muncul jelas di Layar Anda. <br>Buka Aplikasi WhatsApp Anda di HP &rarr; Linked Devices (Tautkan Perangkat) &rarr; Scan Layaknya WhatsApp Web.</p>
+    </div>
+
+    <div class="card">
+        <h2>5. Cara Mengirim Pesan (Outbox SQL & API)</h2>
+        <p>WAGW PRO mendukung dua metode pengiriman pesan: Melakukan Insert data ke Database (Tabel Outbox) ATAU dengan memanggil instruksi REST API.</p>
+
+        <div style="border: 1px solid #ddd; padding:15px; border-radius: 8px; margin-bottom: 20px;">
+            <h3 style="margin-top:0">A. Metode Insert Tabel Outbox SQL</h3>
+            <p>Sangat cocok jika dikendalikan dari *Backend Server* anda (PHP/Java/Python).</p>
+            
+            <strong>1. Pesan Teks:</strong>
+            <pre>INSERT INTO outbox (wa_no, wa_text) VALUES ('628123456789', 'Halo, dari SQL!');</pre>
+            
+            <strong>2. Kirim Gambar dengan Caption:</strong>
+            <div class="note">Logika: Jika tabel outbox di kolom <code>wa_media</code> terisi <i>path lokal gambar</i>, maka diproses sebagai Kirim Gambar. Parameter <code>wa_text</code> menjadi Caption.</div>
+            <pre>INSERT INTO outbox (wa_no, wa_text, wa_media) VALUES ('628123456789', 'Foto produk', 'C:\\images\\produk1.jpg');</pre>
+
+            <strong>3. Kirim File/Dokumen (PDF, DOCX):</strong>
+            <div class="note">Logika: Jika tabel outbox di kolom <code>wa_file</code> terisi path, maka diproses sebagai Kirim Dokumen File.</div>
+            <pre>INSERT INTO outbox (wa_no, wa_text, wa_file) VALUES ('628123456789', 'Berikut lampiran', 'C:\\docs\\invoice_01.pdf');</pre>
+
+            <strong>4. Kirim Tombol (Button):</strong>
+            <pre>INSERT INTO outbox (wa_no, wa_text) VALUES ('628123456789', 'TEXTWITHBUTTON! Pilih Opsi|Kunjungi Web|http://web.com|Beli|http://beli.com');</pre>
+
+            <strong>5. Kirim Polling (Poll):</strong>
+            <pre>INSERT INTO outbox (wa_no, wa_text) VALUES ('628123456789', 'POLLVOTE! Apa buah favorit Anda?:Apel:Mangga:Jeruk');</pre>
+        </div>
+
+        <div style="border: 1px solid #ddd; padding:15px; border-radius: 8px;">
+            <h3 style="margin-top:0">B. Metode Kirim Melalui REST API JSON</h3>
+            <p>Anda bisa men-Hit URL <code>http://localhost:3000/api/send</code> dengan Method <code>POST</code> menggunakan Body berupa format JSON.</p>
+            
+            <strong>Payload Lengkap Kirim Media dan File:</strong>
+            <pre>{
+    "no": "628123456789",
+    "text": "Halo, ini pesan via API!",
+    "media": "C:\\images\\produk1.jpg",
+    "file": "C:\\docs\\invoice.pdf"
+}</pre>
+            <span>*Kosongkan saja key "media" atau "file" jika hanya ingin mengirim Text biasa.</span>
+            <div class="alert" style="margin-top:10px;">
+                <strong>Info:</strong> API Send ini berfungsi mendaftarkan JSON di atas menjadi baris baru pada antrean tabel `outbox`. WAGW PRO akan secara otomatis menghisapnya untuk dikirim menurut sistem antrean *Delay*!
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>6. Integrasi Pesan Masuk (Webhook & Inbox)</h2>
+        <p>WAGW PRO akan merekam semua riwayat chat masuk (Nomor pengirim, Pesan Text, Waktu) langsung ke tabel database <strong>inbox</strong>. Anda bisa memeriksanya berkala.</p>
+        <p>Selain database, Anda juga dapat membajak pesan masuk yang diterima bot tersebut secara <i>Live</i> (Waktu Nyata) menuju link <strong>Webhook</strong> di HTTP Server milik Anda sendiri.</p>
+        <ol>
+            <li>Isi URL Webhook milik Anda di tab Config Dashboard Web (Contoh: <code>http://domain.com/webhook.php</code>)</li>
+            <li>Sistem WAGW PRO akan melakukan POST Request dengan parameter: <code>wa_no</code>, <code>text</code>, dan <code>isMedia</code> setiap kali ada lawan bicara yang mengirim WA.</li>
+            <li>Cek file <code>webhook.php</code> terlampir di folder aplikasi ini untuk mempelajari baris kodenya (mencakup contoh fitur `Balasan Otomatis`).</li>
+        </ol>
+    </div>
+
+    <!-- KONTAK DEVELOPER -->
+    <div class="contact-box">
+        <h3>Butuh Bantuan Lebih Lanjut?</h3>
+        <p>Pengembangan, Kustomisasi Logika Bisnis, dan *Maintenance*.</p>
+        <div style="margin-bottom: 5px;"><strong>Hermawan Dephe</strong></div>
+        <div style="margin-bottom: 5px;"><i class="fa fa-whatsapp"></i> WhatsApp: 0856 9296 1782</div>
+        <div><i class="fa fa-envelope"></i> Email: wawn1782@gmail.com</div>
+    </div>
+
+</body>
+</html>

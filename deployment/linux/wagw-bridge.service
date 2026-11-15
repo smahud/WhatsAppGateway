@@ -1,0 +1,27 @@
+[Unit]
+Description=JIBAS to WAGW transactional outbox move
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=wagw
+Group=wagw
+WorkingDirectory=/opt/wagw
+Environment=NODE_ENV=production
+Environment=TZ=Asia/Jakarta
+ExecStart=/usr/bin/node /opt/wagw/deployment/bridge.js
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
