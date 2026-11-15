@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  statuses: write
 jobs:
   installer:
     runs-on: ubuntu-24.04
@@ -37,4 +38,26 @@ jobs:
           if sudo bash install.sh --user 'invalid:user'; then exit 1; fi
           if sudo bash install.sh --pass; then exit 1; fi
       - name: Validate actual HTTPS and dashboard authentication
-        run: sudo bash deployment/linux/test-nginx.sh
+        run: sudo env PATH="$PATH" bash deployment/linux/test-nginx.sh
+      - name: Publish Linux check result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          GH_RESULT: ${{ job.status }}
+          GH_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node <<'NODE'
+          (async()=>{
+            const state=process.env.GH_RESULT==='success'?'success':'failure';
+            const response=await fetch(`https://api.github.com/repos/${process.env.GH_REPOSITORY}/statuses/${process.env.GH_SHA}`,{
+              method:'POST',
+              headers:{Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},
+              body:JSON.stringify({state,context:'linux-installer/validation',description:'Bash, Node and HTTPS/login smoke checks',target_url:process.env.GH_RUN_URL})
+            });
+            if(!response.ok)throw Error(`Could not publish status: HTTP ${response.status}`);
+            console.log('Linux check result:',state);
+          })().catch(e=>{console.error(e.message);process.exitCode=1;});
+          NODE
+
