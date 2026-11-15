@@ -1,0 +1,40 @@
+name: Linux installer checks
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install text/MySQL dependencies
+        run: npm ci --omit=dev --omit=optional --no-audit --no-fund
+      - name: Offline application tests
+        run: |
+          cp config.example.json config.json
+          node deployment/test-db-loading.js
+          node deployment/test-deployment.js
+          node deployment/test-linux-install.js
+      - name: Install Linux validation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nginx apache2-utils openssl shellcheck
+      - name: Validate Bash and CLI error handling
+        run: |
+          bash -n install.sh deployment/linux/install.sh deployment/linux/test-nginx.sh
+          shellcheck --severity=error install.sh deployment/linux/install.sh deployment/linux/test-nginx.sh
+          bash install.sh --help
+          if sudo bash install.sh --port 0; then exit 1; fi
+          if sudo bash install.sh --port 70000; then exit 1; fi
+          if sudo bash install.sh --user 'invalid:user'; then exit 1; fi
+          if sudo bash install.sh --pass; then exit 1; fi
+      - name: Validate actual HTTPS and dashboard authentication
+        run: sudo bash deployment/linux/test-nginx.sh

@@ -1,5 +1,5 @@
 [Unit]
-Description=WAGW WhatsApp gateway (loopback dashboard)
+Description=WAGW WhatsApp gateway (private backend for authenticated dashboard)
 Wants=network-online.target
 After=network-online.target
 StartLimitIntervalSec=0
@@ -11,7 +11,7 @@ Group=wagw
 WorkingDirectory=/opt/wagw
 Environment=NODE_ENV=production
 Environment=TZ=Asia/Jakarta
-ExecStart=/usr/bin/node /opt/wagw/deployment/start-wagw.js
+ExecStart=/opt/wagw-runtime/node/bin/node /opt/wagw/deployment/start-wagw.js
 Restart=always
 RestartSec=10
 TimeoutStopSec=30

@@ -1,5 +1,7 @@
 # Audit end-to-end — 13 November 2026
 
+Pembaruan 15 November: installer otomatis kini mendukung port publik dan login dashboard melalui HTTPS/Nginx (`install.sh --port 3000 --user admin --pass somepassword`). Node dipasang pada runtime terpisah; detail terbaru ada di [VPS.md](VPS.md) dan README utama. Pernyataan SSH-only/prasyarat Node manual pada audit awal di bawah merupakan catatan historis. Uji penuh instalasi/boot VPS tetap belum dinyatakan lulus.
+
 ## Kesimpulan
 
 Paket deployment outbox MOVE telah diperbaiki dan diuji pada Windows + MariaDB lokal. Siap untuk **uji penerimaan staging**, belum disertifikasi siap produksi Linux karena VPS/OS tujuan belum dikonfirmasi dan tidak tersedia runtime Linux pada sesi audit. Tidak ada pesan nyata baru yang dikirim selama audit.

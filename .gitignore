@@ -24,6 +24,10 @@
 *_log.txt
 *.pid
 *.bak
+*.install-tmp
+/.npm/
+*.key
+*.htpasswd
 /deployment/last-test.json
 
 # Editor / OS files

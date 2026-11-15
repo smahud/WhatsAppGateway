@@ -11,7 +11,7 @@ Group=wagw
 WorkingDirectory=/opt/wagw
 Environment=NODE_ENV=production
 Environment=TZ=Asia/Jakarta
-ExecStart=/usr/bin/node /opt/wagw/deployment/bridge.js
+ExecStart=/opt/wagw-runtime/node/bin/node /opt/wagw/deployment/bridge.js
 Restart=always
 RestartSec=10
 TimeoutStopSec=30

@@ -6,6 +6,32 @@ Gateway WhatsApp berbasis Node.js/Baileys dengan bridge database untuk memindahk
 
 ## Status implementasi
 
+### Instalasi Linux otomatis
+
+Untuk Ubuntu/Debian dengan systemd, clone repository lalu jalankan:
+
+```bash
+git clone https://github.com/smahud/WhatsAppGateway.git
+cd WhatsAppGateway
+sudo bash install.sh --port 3000 --user admin --pass somepassword
+```
+
+Ganti `somepassword` dengan password dashboard pilihan Anda. `--user`/`--pass` adalah login dashboard, **bukan** kredensial database. Password CLI dapat tercatat di shell history; alternatifnya gunakan `--pass-file /root/wagw-dashboard.pass`. Jika `--pass` tidak diberikan pada instalasi pertama, password acak dibuat dan ditampilkan sekali; instalasi berikutnya mempertahankan password lama.
+
+Installer memasang paket OS, runtime Node.js khusus WAGW (tanpa mengganti Node aplikasi lain), dependency, schema/trigger WAGW, dua layanan startup, serta reverse proxy Nginx dengan HTTPS dan login. Source dipasang ke `/opt/wagw`. Bila `config.json` belum tersedia, installer meminta host, port, user, dan password **database JIBAS yang sudah ada** satu kali. `jbssms` dan `wagw` wajib berada pada instance DB yang sama; installer tidak memasang atau membuat JIBAS dari nol.
+
+Sesudah berhasil, buka:
+
+```text
+https://IP_SERVER:3000
+```
+
+Login sebagai `admin` dengan password yang diberikan, lalu scan QR WhatsApp. Sertifikat awal self-signed; cocokkan fingerprint yang dicetak installer sebelum mempercayainya. Permintaan HTTP biasa diarahkan ke HTTPS pada port yang sama. Jika VPS memakai NAT, tentukan alamat publik dengan `--address IP_PUBLIK`. Buka port tersebut pada firewall provider; UFW yang sudah aktif diberi aturan untuk port pilihan tanpa mengaktifkan/reset firewall.
+
+`--port 8080` menghasilkan `https://IP_SERVER:8080`. Port backend dipilih terpisah dan hanya mendengarkan di localhost. Mode MOVE aktif secara default: **hentikan consumer SMS lama sebelum memasang**. Untuk staging tanpa perpindahan pesan, tambahkan `--no-activate-move`. Installer menolak reinstall saat layanan WAGW masih aktif; pause, drain antrean, dan hentikan layanan dalam maintenance dahulu.
+
+Panduan lengkap dan hak akses DB: [deployment/VPS.md](deployment/VPS.md). Validasi seluruh instalasi/boot tetap perlu dilakukan pada VPS tujuan; pengujian Windows tidak menggantikan penerimaan Linux.
+
 Lingkup release ini: **satu akun WhatsApp, outbox teks JIBAS, mode move**. Tidak memerlukan Chrome, Playwright, atau Puppeteer. Koneksi WhatsApp memakai Baileys pihak ketiga, bukan WhatsApp Business Platform resmi Meta.
 
 **Untuk VPS Linux, mulai dari [deployment/VPS.md](deployment/VPS.md).** Hasil dan batas audit tersedia di [deployment/AUDIT.md](deployment/AUDIT.md). Installer Linux disiapkan untuk staging; boot/systemd dan clean install Linux belum diuji dari sesi Windows ini.
@@ -49,7 +75,7 @@ Mode ini memindahkan **antrean**, bukan menunggu pesan diterima HP. Pengiriman W
 | `config.example.json` | Contoh konfigurasi tanpa kredensial |
 | `CONTRACT.md` | Kontrak perilaku, batas perubahan, dan kriteria verifikasi |
 
-## Instalasi baru
+## Instalasi Windows atau manual
 
 Jalankan dari direktori proyek. Siapkan Node.js dan npm, MariaDB/MySQL, serta database JIBAS `jbssms` yang sudah tersedia pada server yang sama dengan `wagw`.
 

@@ -62,6 +62,10 @@ Tidak ada retry jaringan otomatis maupun penerjemahan `sent` menjadi delivery re
 
 ## Deployment dan data sensitif
 
+Installer Linux otomatis mendukung `install.sh --port 3000 --user admin --pass somepassword`. Parameter port adalah port publik HTTPS, user/pass adalah autentikasi dashboard pada Nginx, bukan akun database. Backend WAGW tetap di localhost. Akses publik memerlukan login dan TLS; sertifikat awal self-signed harus diverifikasi fingerprint-nya. Kredensial dashboard disimpan sebagai hash bcrypt di `/etc/wagw`, tidak dalam source/config WAGW. Opsi `--pass-file` menghindari password pada argumen/history.
+
+Mode MOVE diaktifkan default oleh installer baru; menjalankan perintah instalasi berarti menginstruksikan aktivasi. Consumer SMS lama harus sudah dihentikan. `--no-activate-move` memasang dalam keadaan paused untuk staging. Reinstall mempertahankan kredensial DB dan sesi; perubahan username memerlukan password yang diberikan eksplisit. Installer tidak menghentikan layanan aktif secara otomatis atau membuat database JIBAS.
+
 - Bootstrap tidak mengimpor ulang schema asli ke database yang sudah memiliki tabel; instalasi baru mengekstrak CREATE TABLE tanpa menjalankan DROP. Migrasi `sent.status` hanya memperlebar VARCHAR kurang dari 20 karakter agar nilai failed dapat disimpan. SQL dump asli tetap mengandung DROP TABLE dan tidak boleh dieksekusi manual pada data aktif.
 - Runtime, dependency, konfigurasi, sesi, dan data produksi tidak dipublikasikan lewat Git.
 - Startup memerlukan hak Administrator dan verifikasi reboot; keberadaan skrip installer bukan bukti startup sudah terpasang.
@@ -80,7 +84,7 @@ Tidak ada retry jaringan otomatis maupun penerjemahan `sent` menjadi delivery re
 7. Status WAGW dapat direkonsiliasi ke job tanpa memalsukan status SMS JIBAS.
 8. Inbox tetap nonaktif dan source JIBAS tidak diubah. Perubahan WAGW terbatas pada pemuatan driver dan pengaman reconnect/scheduler yang dijelaskan di atas.
 
-Pengaman VPS: launcher menolak startup sebelum DB/schema siap, mengambil named lock gateway, membatasi dashboard ke loopback, dan keluar ketika guard koneksi database hilang. systemd/Windows supervisor kemudian memulihkan proses. Proteksi singleton ini hanya berlaku untuk instance yang menggunakan launcher; menjalankan wabot.js langsung melewatinya.
+Pengaman VPS: launcher menolak startup sebelum DB/schema siap, mengambil named lock gateway, membatasi backend dashboard ke loopback, dan keluar ketika guard koneksi database hilang. Nginx menyediakan endpoint IP:PORT dengan HTTPS/login; systemd/Windows supervisor memulihkan proses. Proteksi singleton ini hanya berlaku untuk instance yang menggunakan launcher; menjalankan wabot.js langsung melewatinya.
 
 Penerimaan produksi tetap memerlukan pengujian pada OS/VPS tujuan, startup ulang/reboot, cutover consumer lama, pairing, dan penerimaan pesan ke nomor tester yang disetujui. Laporan audit Windows tidak menggantikan pengujian Linux.
 

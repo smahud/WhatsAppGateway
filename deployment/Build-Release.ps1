@@ -3,7 +3,7 @@ $wgRoot = Split-Path -Parent $PSScriptRoot
 $wgDist = Join-Path $wgRoot 'dist'
 $wgStage = Join-Path $wgDist ('stage-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $wgStage -Force | Out-Null
-$wgTopFiles = @('wabot.js','webhook.php','package.json','package-lock.json','config.example.json','README.md','CONTRACT.md','tutorial.html','ReadMe.TXT','.gitignore','.gitattributes')
+$wgTopFiles = @('install.sh','wabot.js','webhook.php','package.json','package-lock.json','config.example.json','README.md','CONTRACT.md','tutorial.html','ReadMe.TXT','.gitignore','.gitattributes')
 foreach ($wgFile in $wgTopFiles) { Copy-Item -LiteralPath (Join-Path $wgRoot $wgFile) -Destination (Join-Path $wgStage $wgFile) }
 foreach ($wgDirectory in @('public','create tables','deployment')) {
     $wgSource = Join-Path $wgRoot $wgDirectory
