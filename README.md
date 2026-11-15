@@ -1,4 +1,4 @@
-# WAGW PRO â€” Integrasi Outbox SMS JIBAS
+# WAGW PRO — Integrasi Outbox SMS JIBAS
 
 Repository: [smahud/WhatsAppGateway](https://github.com/smahud/WhatsAppGateway).
 
@@ -187,4 +187,3 @@ Skrip memverifikasi akun, memeriksa kandidat file terhadap kredensial lokal, mem
 Repository GitHub private perlu diizinkan pada PAT yang digunakan dan, jika memakai koneksi GitHub ChatGPT, pada koneksi tersebut juga. Menyiapkan file atau commit lokal tidak membuktikan push berhasil; verifikasi commit di GitHub sebelum deployment.
 
 Catatan teknis lebih lanjut: [deployment/OUTBOX.md](deployment/OUTBOX.md). Kontrak implementasi: [CONTRACT.md](CONTRACT.md).
-

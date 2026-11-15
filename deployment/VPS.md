@@ -1,4 +1,4 @@
-# Deployment VPS â€” outbox JIBAS ke WhatsApp
+# Deployment VPS — outbox JIBAS ke WhatsApp
 
 Target panduan: Ubuntu/Debian dengan systemd dan akses sudo/SSH. Installer memasang runtime Node.js khusus WAGW, dependency, HTTPS/login, serta layanan startup. Validasi boot dan koneksi DB pada VPS tujuan tetap diperlukan.
 
@@ -153,4 +153,3 @@ Aktifkan kembali dengan `sudo -u wagw /opt/wagw-runtime/node/bin/node deployment
 - Tidak ada klaim seluruh fitur SMS JIBAS telah digantikan. Perintah otomatis, PIN/nilai berbasis pesan, multimedia, dan fitur gateway lama memerlukan pengujian terpisah.
 
 Referensi: [npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/), [MySQL CREATE TRIGGER](https://dev.mysql.com/doc/refman/8.4/en/create-trigger.html).
-

@@ -1,4 +1,4 @@
-# Audit end-to-end â€” 13 November 2026
+# Audit end-to-end — 13 November 2026
 
 Pembaruan 15 November: installer otomatis kini mendukung port publik dan login dashboard melalui HTTPS/Nginx (`install.sh --port 3000 --user admin --pass somepassword`). Node dipasang pada runtime terpisah; detail terbaru ada di [VPS.md](VPS.md) dan README utama. Pernyataan SSH-only/prasyarat Node manual pada audit awal di bawah merupakan catatan historis. Uji penuh instalasi/boot VPS tetap belum dinyatakan lulus.
 
@@ -47,4 +47,3 @@ Sebelum produksi, jalankan checklist [VPS.md](VPS.md), pastikan consumer lama be
 ## Batas perubahan source
 
 Source JIBAS tidak diubah. WAGW hanya berubah untuk lazy-loading driver, menjaga satu scheduler, dan menghindari inisialisasi DB berulang pada reconnect ketika koneksi masih sehat. Pengaman VPS, instalasi, dan pemeriksaan ditempatkan di deployment. Inbox tetap di luar scope.
-
