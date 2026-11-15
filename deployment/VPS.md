@@ -1,4 +1,4 @@
-# Deployment VPS — outbox JIBAS ke WhatsApp
+# Deployment VPS â€” outbox JIBAS ke WhatsApp
 
 Target panduan: Ubuntu/Debian dengan systemd dan akses sudo/SSH. Installer memasang runtime Node.js khusus WAGW, dependency, HTTPS/login, serta layanan startup. Validasi boot dan koneksi DB pada VPS tujuan tetap diperlukan.
 
@@ -120,7 +120,7 @@ Pastikan:
 - Restart layanan dan reboot VPS tidak menggandakan enqueue atau meminta QR ulang selama sesi masih valid.
 - Simulasi database belum siap dilakukan di staging: gateway harus gagal startup/restart, bridge reconnect, lalu pulih ketika database siap.
 
-Audit Windows telah memverifikasi transaksi move dan status dengan tabel sementara tanpa pesan eksternal baru. Reboot Linux, clean npm install lintas-platform, systemd, dan delivery mode move pada VPS **belum** diverifikasi.
+Audit Windows telah memverifikasi transaksi move dan status dengan tabel sementara tanpa pesan eksternal baru. [CI Ubuntu 24.04](https://github.com/smahud/WhatsAppGateway/actions/runs/43679657986) lulus untuk clean npm install profil minimal, Bash/shellcheck, CLI, dan Nginx HTTPS/login nyata. Instalasi OS/runtime melalui installer lengkap, boot systemd, reboot, dan delivery mode move dengan DB pada VPS tujuan **belum** diverifikasi.
 
 ## Operasional, maintenance, dan rollback
 
@@ -153,3 +153,4 @@ Aktifkan kembali dengan `sudo -u wagw /opt/wagw-runtime/node/bin/node deployment
 - Tidak ada klaim seluruh fitur SMS JIBAS telah digantikan. Perintah otomatis, PIN/nilai berbasis pesan, multimedia, dan fitur gateway lama memerlukan pengujian terpisah.
 
 Referensi: [npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/), [MySQL CREATE TRIGGER](https://dev.mysql.com/doc/refman/8.4/en/create-trigger.html).
+

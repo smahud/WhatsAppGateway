@@ -1,4 +1,4 @@
-# WAGW PRO — Integrasi Outbox SMS JIBAS
+# WAGW PRO â€” Integrasi Outbox SMS JIBAS
 
 Repository: [smahud/WhatsAppGateway](https://github.com/smahud/WhatsAppGateway).
 
@@ -30,11 +30,11 @@ Login sebagai `admin` dengan password yang diberikan, lalu scan QR WhatsApp. Ser
 
 `--port 8080` menghasilkan `https://IP_SERVER:8080`. Port backend dipilih terpisah dan hanya mendengarkan di localhost. Mode MOVE aktif secara default: **hentikan consumer SMS lama sebelum memasang**. Untuk staging tanpa perpindahan pesan, tambahkan `--no-activate-move`. Installer menolak reinstall saat layanan WAGW masih aktif; pause, drain antrean, dan hentikan layanan dalam maintenance dahulu.
 
-Panduan lengkap dan hak akses DB: [deployment/VPS.md](deployment/VPS.md). Validasi seluruh instalasi/boot tetap perlu dilakukan pada VPS tujuan; pengujian Windows tidak menggantikan penerimaan Linux.
+Panduan lengkap dan hak akses DB: [deployment/VPS.md](deployment/VPS.md). [Pengujian Ubuntu 24.04](https://github.com/smahud/WhatsAppGateway/actions/runs/43679657986) telah lulus untuk dependency minimal, Bash/CLI, konfigurasi, serta HTTPS/login Nginx nyata. Instalasi penuh dan reboot dengan database produksi tetap perlu diuji pada VPS tujuan.
 
 Lingkup release ini: **satu akun WhatsApp, outbox teks JIBAS, mode move**. Tidak memerlukan Chrome, Playwright, atau Puppeteer. Koneksi WhatsApp memakai Baileys pihak ketiga, bukan WhatsApp Business Platform resmi Meta.
 
-**Untuk VPS Linux, mulai dari [deployment/VPS.md](deployment/VPS.md).** Hasil dan batas audit tersedia di [deployment/AUDIT.md](deployment/AUDIT.md). Installer Linux disiapkan untuk staging; boot/systemd dan clean install Linux belum diuji dari sesi Windows ini.
+**Untuk VPS Linux, mulai dari [deployment/VPS.md](deployment/VPS.md).** Hasil dan batas audit tersedia di [deployment/AUDIT.md](deployment/AUDIT.md). Pemeriksaan Ubuntu CI sudah lulus; pemasangan penuh systemd, reboot dan DB tujuan masih memerlukan uji staging.
 
 - **Outbox: move aktif.** Ketika jadwalnya tiba, pesan dimasukkan ke antrean WAGW dan dihapus dari antrean JIBAS dalam satu transaksi.
 - **Inbox: nonaktif.** Sinkronisasi pesan baru dan penghapusan dua arah belum diimplementasikan sebagai fitur yang siap digunakan.
@@ -187,3 +187,4 @@ Skrip memverifikasi akun, memeriksa kandidat file terhadap kredensial lokal, mem
 Repository GitHub private perlu diizinkan pada PAT yang digunakan dan, jika memakai koneksi GitHub ChatGPT, pada koneksi tersebut juga. Menyiapkan file atau commit lokal tidak membuktikan push berhasil; verifikasi commit di GitHub sebelum deployment.
 
 Catatan teknis lebih lanjut: [deployment/OUTBOX.md](deployment/OUTBOX.md). Kontrak implementasi: [CONTRACT.md](CONTRACT.md).
+
