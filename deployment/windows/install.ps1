@@ -61,7 +61,7 @@ try {
     if ($options -contains '--help' -or $options -contains '-h') {
         $node = Get-JibasNode
         if ($node) { & $node $installer --help; exit $LASTEXITCODE }
-        Write-Output 'JIBAS WhatsApp Gateway - Install_to_Windows_Service.bat [--user NAME] [--pass PASSWORD | --pass-file PATH] [--credentials-only | --no-activate-move]'
+        Write-Output 'JIBAS WhatsApp Gateway - Install-Windows-Service.ps1 [-User NAME] [-Pass PASSWORD | -PassFile PATH] [-CredentialsOnly | -NoActivateMove]'
         exit 0
     }
     Assert-JibasAdmin

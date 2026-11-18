@@ -37,7 +37,7 @@ Dokumen ini adalah acuan operasional untuk agen otomatis, kontributor, dan opera
 1. **Jangan membuat instalasi tanpa JIBAS.** Launcher dan installer harus menolak konfigurasi yang tidak memiliki `jbssms.outbox`, trigger, dan schema gateway yang valid.
 2. **Jangan mengubah `database: "wagw"` pada instalasi lama.** Nama itu adalah identitas kompatibilitas, bukan nama aplikasi. Mengubahnya dapat membuat antrean lama tidak terlihat.
 3. **Pertahankan identifier legacy yang masih diperlukan upgrade:** schema `wagw`, lock `wagw-gateway` dan `wagw-jibas-bridge`, kolom `wagw_id`, trigger `wagw_*`, path `/opt/wagw`, unit lama, serta registrasi service `wagwpro.exe`. Rename hanya untuk identitas yang terlihat pengguna dan instalasi baru.
-4. **Jangan menyentuh produksi tanpa izin.** Termasuk `Install_to_Windows_Service.bat`, `install.sh`, `uninstall.sh`, `deploy.js`, `activate.js`, `pause.js`, restart service, perubahan trigger, dan pengiriman pesan nyata.
+4. **Jangan menyentuh produksi tanpa izin.** Termasuk `Install-Windows-Service.ps1`, `Install_to_Windows_Service.bat`, `install.sh`, `uninstall.sh`, `deploy.js`, `activate.js`, `pause.js`, restart service, perubahan trigger, dan pengiriman pesan nyata.
 5. **Jangan commit data sensitif.** `config.json`, `dashboard-auth.json`, `sessions/`, `.runtime/`, `node_modules/`, database, log, PID, backup, sertifikat, password, dan PAT tidak boleh masuk Git. Gunakan `deployment/Build-Release.ps1` untuk paket source.
 6. **Jangan menambah fitur di luar scope** tanpa persetujuan dan pengujian tersendiri. Jalur OTA, webhook/bot, inbox, dan pesan masuk sudah dihapus dari alur utama.
 7. **Jangan menjanjikan exactly-once delivery.** Transaksi database dan referensi ID mencegah duplikasi enqueue, tetapi crash antara pengiriman jaringan dan pencatatan SQL tetap dapat menimbulkan pesan ganda atau tidak tercatat.
@@ -59,6 +59,8 @@ Dokumen ini adalah acuan operasional untuk agen otomatis, kontributor, dan opera
 | `deployment/deploy.js` | Bootstrap schema, migrasi `sent.status`, pemasangan trigger, dan aktivasi MOVE. |
 | `deployment/move.js`, `activate.js`, `pause.js`, `doctor.js` | Kontrol MOVE, diagnosa antrean, dan aktivasi setelah cutover. |
 | `deployment/dashboard-auth.js`, `dashboard-credentials.js`, `login.html` | Login form, cookie server-side, hash scrypt/bcrypt, dan rotasi kredensial. |
+| `Install-Windows-Service.ps1`, `Uninstall-Windows-Service.ps1` | Script PowerShell native untuk install dan uninstall service Windows (menggantikan `.bat` sebagai entry-point utama). |
+| `Install_to_Windows_Service.bat`, `Uninstall_Windows_Service.bat` | Wrapper kompatibilitas `.bat` untuk klik-dua-kali dari Explorer; meneruskan ke script `.ps1`. |
 | `deployment/windows/` | Installer, proteksi ACL, registrasi SCM `JIBAS_WG.exe`, migrasi, repair, dan uninstall. |
 | `deployment/linux/` | Installer systemd, Nginx HTTPS, port ownership, migrasi `/opt/wagw`, service, dan uninstall. |
 | `public/` | Dashboard dan aset frontend. |

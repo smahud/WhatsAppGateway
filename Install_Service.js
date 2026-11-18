@@ -62,14 +62,14 @@ async function install(args) {
   const { values, switches } = parseArgs(args);
   if (switches.has('--help') || switches.has('-h')) {
     console.log(`JIBAS WhatsApp Gateway
-Install_to_Windows_Service.bat [--user NAME] [--pass PASSWORD | --pass-file PATH]
+Install-Windows-Service.ps1 [-User NAME] [-Pass PASSWORD | -PassFile PATH]
 Default: pasang bridge JIBAS, aktifkan MOVE, dan buat login admin dengan password acak pada pemasangan pertama.
 Hentikan consumer SMS lama sebelum cutover. Jalankan lagi perintah yang sama untuk memperbaiki instalasi sendiri.
-  --user NAME         Ganti username; password baru dibuat bila --pass/--pass-file tidak diberikan
-  --credentials-only  Ubah login dashboard tanpa restart atau mengubah database/service
-  --no-activate-move  Siapkan JIBAS dengan MOVE dijeda; aktifkan kemudian dengan deployment/activate.js
-  --pause-outbox      Staging JIBAS: jeda MOVE dan jangan kirim antrean WhatsApp dari proses ini
-  --db-only           Diagnostik schema JIBAS yang sudah siap, tanpa mengubah DB atau menghubungkan WhatsApp
+  -User NAME          Ganti username; password baru dibuat bila -Pass/-PassFile tidak diberikan
+  -CredentialsOnly    Ubah login dashboard tanpa restart atau mengubah database/service
+  -NoActivateMove     Siapkan JIBAS dengan MOVE dijeda; aktifkan kemudian dengan deployment/activate.js
+  -PauseOutbox        Staging JIBAS: jeda MOVE dan jangan kirim antrean WhatsApp dari proses ini
+  -DbOnly             Diagnostik schema JIBAS yang sudah siap, tanpa mengubah DB atau menghubungkan WhatsApp
 Jalankan instalasi service sebagai Administrator. Dashboard Windows hanya di localhost.`);
     return;
   }

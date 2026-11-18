@@ -48,23 +48,27 @@ notepad.exe .\config.json
 Isi `host`, `db_port`, `user`, dan `password` sesuai **database JIBAS**. Untuk instalasi baru gunakan `db_type: "mysql"` dan `database: "jibas_wg"`. `port` (default `3000`) adalah port **dashboard**, bukan port DB. Simpan file, lalu jalankan:
 
 ```powershell
-.\Install_to_Windows_Service.bat
+.\Install-Windows-Service.ps1
+# atau jika kebijakan script dibatasi:
+powershell -ExecutionPolicy Bypass -File .\Install-Windows-Service.ps1
 ```
+
+> **Catatan:** File `.bat` lama (`Install_to_Windows_Service.bat`) tetap tersedia sebagai wrapper kompatibilitas untuk pengguna yang terbiasa klik-dua-kali dari Explorer, namun script utama adalah `.ps1`.
 
 Jika pemasangan pertama tanpa opsi login, installer mencetak `admin` dan password acak **sekali** di terminal. Simpan password tersebut. Buka **http://127.0.0.1:3000/login** (ganti port jika diubah). Setelah login berhasil, aplikasi membuka dashboard. Dashboard Windows hanya tersedia di localhost.
 
 ```powershell
 # Install/repair dan tetapkan login baru:
-.\Install_to_Windows_Service.bat --user admin --pass "GANTI_DENGAN_PASSWORD_KUAT"
+.\Install-Windows-Service.ps1 -User admin -Pass "GANTI_DENGAN_PASSWORD_KUAT"
 
 # Staging JIBAS: pasang trigger tetapi jangan pindahkan antrean baru:
-.\Install_to_Windows_Service.bat --no-activate-move
+.\Install-Windows-Service.ps1 -NoActivateMove
 
 # Ganti login saja, tanpa restart dan tanpa mengubah DB:
-.\Install_to_Windows_Service.bat --credentials-only --user operator --pass-file "C:\Private\jibas-wg.pass"
+.\Install-Windows-Service.ps1 -CredentialsOnly -User operator -PassFile "C:\Private\jibas-wg.pass"
 
 # Lepas Windows Service; tidak menghapus konfigurasi, login, sesi, atau data:
-.\Uninstall_Windows_Service.bat
+.\Uninstall-Windows-Service.ps1
 ```
 
 ## Ubuntu/Debian
