@@ -1,5 +1,6 @@
 'use strict';
-const {connect,assertRuntime}=require('./database');
+const {config,connect,assertRuntime,assertCutover,acquireLock,BRIDGE_LOCK}=require('./database');
+const {setTimeout:sleep}=require('node:timers/promises');
 function normalize(number) {
   let n = String(number).trim().replace(/[+\s()\-]/g, '');
   if (n.startsWith('0')) n = '62' + n.slice(1);
@@ -12,16 +13,12 @@ function validate(job) {
   if (job.multipart === 'true') throw Error('Multipart/PDU memerlukan decoder, tidak dikirim otomatis');
   const message = String(job.message || '');
   if (!message.trim()) throw Error('Pesan kosong');
-  if ([...message].length > 2000) throw Error('Pesan melebihi batas schema WAGW 2000 karakter');
-  // WAGW interprets these prefixes as special operations, not literal SMS text.
-  if (/^(POLLVOTE!|TEXTWITHBUTTON!|\[REQ_ONLINE\])/.test(message)) throw Error('Awalan pesan merupakan perintah khusus WAGW');
+  if ([...message].length > 2000) throw Error('Pesan melebihi batas schema JIBAS WG 2000 karakter');
+  // Legacy prefixes must not turn SMS text into commands.
+  if (/^(POLLVOTE!|TEXTWITHBUTTON!|\[REQ_ONLINE\])/.test(message)) throw Error('Awalan pesan merupakan perintah khusus gateway');
   return {number, message};
 }
-async function tick(c, {sourceTable = 'jbssms.outbox'} = {}) {
-  if (!['jbssms.outbox','test_jibas_outbox'].includes(sourceTable)) throw Error('Invalid source table');
-  const [[control]] = await c.query('SELECT * FROM bridge_control WHERE id=1');
-  if (!control.enabled) return;
-  if (control.mode !== 'whatsapp') throw Error('Bridge ini hanya mendukung mode move (whatsapp)');
+async function moveOne(c, sourceTable) {
   await c.beginTransaction();
   try {
     // Match JIBAS UPDATE lock order: source row first, capture row second.
@@ -29,7 +26,7 @@ async function tick(c, {sourceTable = 'jbssms.outbox'} = {}) {
     if (candidate) {
       const [[source]] = await c.query(`SELECT *, (SendingDateTime IS NULL OR SendingDateTime='0000-00-00 00:00:00' OR SendingDateTime<=NOW()) AS due FROM ${sourceTable} WHERE ID=? FOR UPDATE`,[candidate.source_id]);
       const [[job]] = await c.query('SELECT * FROM bridge_outgoing WHERE id=? FOR UPDATE',[candidate.id]);
-      if (job.state !== 'pending') { await c.commit(); return; }
+      if (!job || job.state !== 'pending') { await c.commit(); return; }
       if (!source) {
         // Another consumer/deletion won: never send a stale captured copy.
         await c.execute("UPDATE bridge_outgoing SET state='cancelled',error='Source no longer exists; not moved' WHERE id=?",[job.id]);
@@ -49,42 +46,46 @@ async function tick(c, {sourceTable = 'jbssms.outbox'} = {}) {
     }
     await c.commit();
   } catch(e) { await c.rollback().catch(()=>{}); throw e; }
-  await c.query("UPDATE bridge_outgoing b JOIN sent s ON s.id=b.wagw_id SET b.state=IF(s.status='sent','sent','failed'),b.error=IF(s.status='sent',NULL,CONCAT('WAGW: ',s.status)) WHERE b.state='queued'");
-  // Never automatically retry a send: WAGW itself has no end-to-end idempotency key.
-  if (!control.inbox_enabled) return;
-  const [incoming] = await c.query("SELECT i.* FROM inbox i LEFT JOIN bridge_incoming b ON b.source_id=i.id WHERE b.source_id IS NULL ORDER BY i.id LIMIT 20");
-  for (const item of incoming) {
-    let number;
-    try { number=normalize(item.wa_no); } catch(e) {
-      await c.execute("INSERT INTO bridge_incoming(source_id,state,error) VALUES(?,'rejected',?)",[item.id,e.message]);
-      continue;
-    }
-    const marker = 'WAGW:' + item.id;
-    // JIBAS inbox is MyISAM: the marker makes recovery safe after a crash between
-    // the inbox insert and the InnoDB receipt, without pretending rollback works.
-    const [[found]] = await c.execute('SELECT ID FROM jbssms.inbox WHERE RecipientID=? LIMIT 1',[marker]);
-    let id = found && found.ID;
-    if (!id) {
-      const [result] = await c.execute("INSERT INTO jbssms.inbox(ReceivingDateTime,Text,SenderNumber,Coding,UDH,SMSCNumber,TextDecoded,RecipientID,Processed,Status) VALUES(?, ?, ?, 'Unicode_No_Compression', '', '', ?, ?, 'false', 0)",
-        [item.wa_time,item.wa_text,number.startsWith('62')?'0'+number.slice(2):number, [...item.wa_text].slice(0,160).join(''),marker]);
-      id=result.insertId;
-    }
-    await c.execute("INSERT INTO bridge_incoming(source_id,destination_id,state) VALUES(?,?,'copied')",[item.id,id]);
-  }
 }
-async function run() {
-  let c;
-  for (;;) {
+
+async function tick(c, {sourceTable = 'jbssms.outbox', checkCutover = false, schema} = {}) {
+  if (!['jbssms.outbox','test_jibas_outbox'].includes(sourceTable)) throw Error('Invalid source table');
+  const [[control]] = await c.query('SELECT * FROM bridge_control WHERE id=1');
+  if (!control || control.mode !== 'whatsapp' || Number(control.inbox_enabled) !== 0) {
+    throw Error('Bridge JIBAS hanya mendukung MOVE outbox WhatsApp');
+  }
+  const enabled = Number(control.enabled) === 1;
+  if (enabled) {
+    if (checkCutover) await assertCutover(c,schema);
+    await moveOne(c, sourceTable);
+  }
+  // Pausing only stops new transfers; reconcile already queued jobs either way.
+  await c.query("UPDATE bridge_outgoing b JOIN sent s ON s.id=b.wagw_id SET b.state=IF(s.status='sent','sent','failed'),b.error=IF(s.status='sent',NULL,CONCAT('JIBAS WG: ',s.status)) WHERE b.state='queued'");
+  return enabled;
+}
+async function run(signal, cfg=config()) {
+  while (!signal?.aborted) {
+    let c;
     try {
-      c=await connect();
-      await assertRuntime(c);
-      const [[lock]]=await c.query("SELECT GET_LOCK('wagw-jibas-bridge',0) AS acquired");
-      if (!lock.acquired) throw Error('Bridge lain sudah berjalan');
-      for (;;) { await tick(c); await new Promise(r=>setTimeout(r,2000)); }
-    } catch(e) { console.error(new Date().toISOString(),e.message); }
+      c=await connect(cfg);
+      c.on('error',err=>{if(!signal?.aborted)console.error('Worker DB:',err.code||err.message);});
+      await assertRuntime(c,cfg.database);
+      await acquireLock(c,BRIDGE_LOCK);
+      let enabled=false;
+      while (!signal?.aborted) {
+        enabled=await tick(c,{checkCutover:!enabled,schema:cfg.database});
+        await sleep(2000,undefined,{signal});
+      }
+    } catch(e) { if(!signal?.aborted) console.error(new Date().toISOString(),e.message); }
     finally { if(c) await c.end().catch(()=>{}); }
-    await new Promise(r=>setTimeout(r,5000));
+    try { await sleep(5000,undefined,{signal}); }
+    catch(e) { if(!signal?.aborted) throw e; }
   }
 }
-module.exports={normalize,validate,tick};
-if(require.main===module) run();
+module.exports={normalize,validate,tick,run};
+if(require.main===module){
+ const stop=new AbortController();
+ process.once('SIGTERM',()=>stop.abort());
+ process.once('SIGINT',()=>stop.abort());
+ run(stop.signal).catch(err=>{console.error(err.code||'',err.message);process.exitCode=1;});
+}

@@ -1,0 +1,31 @@
+[Unit]
+Description=JIBAS WhatsApp Gateway
+Wants=network-online.target jibas-wg-bridge.service
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=jibas-wg
+Group=jibas-wg
+WorkingDirectory=/opt/jibas-wg
+Environment=NODE_ENV=production
+Environment=TZ=Asia/Jakarta
+Environment=JIBAS_WG_BRIDGE_EXTERNAL=1
+Environment=JIBAS_WG_DASHBOARD_HTTPS=1
+ExecStart=/opt/jibas-wg-runtime/node/bin/node /opt/jibas-wg/deployment/start-gateway.js
+Restart=always
+RestartSec=10
+KillMode=control-group
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/jibas-wg/config.json /opt/jibas-wg/sessions
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

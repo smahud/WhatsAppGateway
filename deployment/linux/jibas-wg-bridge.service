@@ -1,17 +1,18 @@
 [Unit]
-Description=JIBAS to WAGW transactional outbox move
+Description=JIBAS WhatsApp Gateway outbox worker
 Wants=network-online.target
-After=network-online.target
+After=network-online.target jibas-wg-gateway.service
+PartOf=jibas-wg-gateway.service
 StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-User=wagw
-Group=wagw
-WorkingDirectory=/opt/wagw
+User=jibas-wg
+Group=jibas-wg
+WorkingDirectory=/opt/jibas-wg
 Environment=NODE_ENV=production
 Environment=TZ=Asia/Jakarta
-ExecStart=/opt/wagw-runtime/node/bin/node /opt/wagw/deployment/bridge.js
+ExecStart=/opt/jibas-wg-runtime/node/bin/node /opt/jibas-wg/deployment/bridge.js
 Restart=always
 RestartSec=10
 TimeoutStopSec=30

@@ -1,95 +1,95 @@
 param(
-    [string]$PatFile = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'github.pat.json'),
-    [string]$Message = 'Harden WAGW JIBAS deployment and add VPS installer',
-    [ValidatePattern('^[A-Za-z0-9_.-]+$')]
-    [string]$Repository = 'WhatsAppGateway',
+    [string]$PatFile = (Join-Path (Split-Path -Parent $PSScriptRoot) 'github.pat.txt'),
     [switch]$AllowPublic,
-    [switch]$CreatePrivateRepository
+    [switch]$CheckOnly
 )
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$wgRoot = Split-Path -Parent $PSScriptRoot
-Set-Location -LiteralPath $wgRoot
-$wgOwner = 'smahud'
-$wgRepository = $Repository
-$wgUrl = "https://github.com/$wgOwner/$wgRepository.git"
-function Invoke-WgGit {
-    param([string[]]$GitArguments)
+$root = Split-Path -Parent $PSScriptRoot
+$owner = 'smahud'
+$repository = 'WhatsAppGateway' # Existing remote; keep its public URL and history.
+$url = "https://github.com/$owner/$repository.git"
+$token = $null
+$saved = @{}
+$locationSet = $false
+$privatePath = '(?i)(^|/)(config\.json|dashboard-auth\.json|github\.pat(?:\.[^/]+)?|\.env(?:\.[^/]+)?|sessions|node_modules|daemon|\.runtime|\.git|dist|node\.exe)(/|$)|\.(sqlite|db)(?:-[^/]*)?$|\.(log|pid|bak|install-tmp|htpasswd|key|pem|pfx|pass)$|(^|/)[^/]*_log\.txt$|(^|/)last-test\.json$'
+
+function Invoke-GitChecked([string[]]$GitArguments) {
     & git @GitArguments
     if ($LASTEXITCODE -ne 0) { throw 'Git command failed; no force push is attempted.' }
 }
-$wgToken = $null
-$wgSavedEnv = @{}
+
 try {
-    $wgCredentials = Get-Content -LiteralPath $PatFile -Raw | ConvertFrom-Json
-    $wgToken = $wgCredentials.smahud
-    if ($wgToken -isnot [string] -or [string]::IsNullOrWhiteSpace($wgToken)) { throw 'Missing smahud PAT.' }
-    $wgHeaders = @{ Authorization = 'Bearer ' + $wgToken; Accept = 'application/vnd.github+json'; 'User-Agent' = 'WAGW-Deployment' }
-    $wgUser = Invoke-RestMethod -Uri 'https://api.github.com/user' -Headers $wgHeaders
-    if ($wgUser.login -ne $wgOwner) { throw 'PAT does not belong to smahud; publishing stopped.' }
-    $wgRemotes = @(& git remote)
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect Git remotes.' }
-    $wgHasOrigin = $wgRemotes -contains 'origin'
-    if ($wgHasOrigin) {
-        $wgRemote = & git remote get-url origin
-        if ($LASTEXITCODE -ne 0 -or $wgRemote -ne $wgUrl) { throw 'Origin differs from requested destination; review it manually.' }
+    $PatFile = (Resolve-Path -LiteralPath $PatFile).Path
+    Push-Location -LiteralPath $root
+    $locationSet = $true
+    if ((Invoke-GitChecked @('branch','--show-current')) -ne 'main') { throw 'Expected local main.' }
+    $raw = [IO.File]::ReadAllText($PatFile)
+    # Accept a raw PAT or a text file containing one labeled PAT. Never print the file.
+    $tokens = @([regex]::Matches($raw, '(?<![A-Za-z0-9_])(?:github_pat_[A-Za-z0-9_]{30,}|ghp_[A-Za-z0-9]{30,}|[0-9a-fA-F]{40})(?![A-Za-z0-9_])') |
+        Select-Object -ExpandProperty Value -Unique)
+    if ($tokens.Count -ne 1) { throw 'Expected exactly one GitHub PAT in the supplied file.' }
+    $token = $tokens[0]
+    $headers = @{ Authorization = "Bearer $token"; Accept = 'application/vnd.github+json'; 'User-Agent' = 'JIBAS-WG' }
+    $user = Invoke-RestMethod -Uri 'https://api.github.com/user' -Headers $headers -TimeoutSec 30
+    if ($user.login -ne $owner) { throw "PAT does not belong to $owner." }
+    $repo = Invoke-RestMethod -Uri "https://api.github.com/repos/$owner/$repository" -Headers $headers -TimeoutSec 30
+    if ($repo.full_name -cne "$owner/$repository" -or $repo.archived -or !$repo.permissions.push) { throw 'Repository is not a verified writable destination.' }
+    if (!$repo.private -and !$AllowPublic) { throw 'Repository is public. Review the commit and pass -AllowPublic to publish.' }
+    $oldUrl = @((Invoke-GitChecked @('remote')) | Where-Object { $_ -eq 'origin' })
+    if ($oldUrl -and ((Invoke-GitChecked @('remote','get-url','origin')) -ne $url -or
+          (Invoke-GitChecked @('remote','get-url','--push','origin')) -ne $url)) {
+        throw 'Origin or its push URL differs from the verified destination.'
     }
-    $wgRepo = $null
-    try { $wgRepo = Invoke-RestMethod -Uri "https://api.github.com/repos/$wgOwner/$wgRepository" -Headers $wgHeaders }
-    catch {
-        if (-not $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 404) { throw }
-    }
-    if ($wgRepo -and -not $wgRepo.private -and -not $AllowPublic) { throw 'Existing repo is public. Review contents and use -AllowPublic only if publishing publicly is intended.' }
-    if (-not $wgRepo -and -not $CreatePrivateRepository) { throw 'Repository not found or PAT lacks access. Check -Repository and PAT permissions; no repository was created.' }
-    $wgBranch = & git branch --show-current
-    if ($LASTEXITCODE -ne 0 -or $wgBranch -ne 'main') { throw 'Expected local main branch; no branch changes are made.' }
-    $wgCandidates = @(& git -c core.quotepath=false ls-files --cached --others --exclude-standard)
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect Git candidate files.' }
-    $wgSecrets = @($wgCredentials.PSObject.Properties | Where-Object { $_.Value -is [string] -and $_.Value.Length -gt 10 } | ForEach-Object { $_.Value })
-    if (Test-Path -LiteralPath config.json) {
-        $wgDbPassword = (Get-Content -LiteralPath config.json -Raw | ConvertFrom-Json).password
-        if ($wgDbPassword) { $wgSecrets += $wgDbPassword }
-    }
-    foreach ($wgFile in $wgCandidates) {
-        if ($wgFile -match '(^|/)(config\.json|sessions|node_modules|\.git|dist)(/|$)|\.(sqlite|db|log|pid|bak)$|(^|/)[^/]*_log\.txt$|(^|/)github\.pat\.json$|deployment/last-test\.json$|(^|/)node\.exe$') { throw "Sensitive/runtime file would be published: $wgFile" }
-        $wgPath = Join-Path $wgRoot $wgFile
-        if (-not (Test-Path -LiteralPath $wgPath -PathType Leaf)) { continue }
-        $wgContent = [System.IO.File]::ReadAllText($wgPath)
-        foreach ($wgSecret in $wgSecrets) { if ($wgContent.Contains($wgSecret)) { throw "Credential detected in candidate file: $wgFile" } }
-    }
-    Invoke-WgGit -GitArguments @('diff','--check')
-    Invoke-WgGit -GitArguments @('add','--all')
-    & git diff --cached --quiet
-    if ($LASTEXITCODE -eq 1) { Invoke-WgGit -GitArguments @('commit','-m',$Message) }
-    elseif ($LASTEXITCODE -ne 0) { throw 'Cannot inspect staged changes.' }
-    if (-not $wgRepo) {
-        $wgBody = @{name=$wgRepository;private=$true;description='WAGW WhatsApp gateway with transactional JIBAS outbox move integration'} | ConvertTo-Json
-        $wgRepo = Invoke-RestMethod -Uri 'https://api.github.com/user/repos' -Headers $wgHeaders -Method Post -ContentType 'application/json' -Body $wgBody
-    }
-    if ($wgRepo.full_name -ne "$wgOwner/$wgRepository") { throw 'Unexpected repository returned by GitHub.' }
-    if (-not $wgHasOrigin) { Invoke-WgGit -GitArguments @('remote','add','origin',$wgUrl) }
-    # Process-local header only: never put PAT in origin, a file, or git arguments.
-    $wgEnvValues = @{
+
+    $extraHeaders = @(& git config --name-only --get-regexp '^http(\..*)?\.extraheader$')
+    if ($LASTEXITCODE -notin 0,1 -or $extraHeaders.Count) { throw 'Git already has HTTP extra headers configured; review them before publishing.' }
+    $envValues = @{
         GIT_CONFIG_COUNT='1';
         GIT_CONFIG_KEY_0='http.https://github.com/.extraheader';
-        GIT_CONFIG_VALUE_0=('AUTHORIZATION: basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('x-access-token:' + $wgToken)));
-        GIT_TERMINAL_PROMPT='0'; GIT_TRACE='0'; GIT_TRACE_CURL='0'; GIT_CURL_VERBOSE='0'
+        GIT_CONFIG_VALUE_0=('Authorization: Basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("x-access-token:$token")));
+        GIT_TERMINAL_PROMPT='0'; GIT_TRACE='0'; GIT_TRACE_CURL='0'; GIT_CURL_VERBOSE='0';
+        GIT_TRACE2='0'; GIT_TRACE2_EVENT='0'; GIT_TRACE2_PERF='0'; GIT_TRACE_PACKET='0'
     }
-    foreach ($wgName in $wgEnvValues.Keys) {
-        $wgSavedEnv[$wgName] = [Environment]::GetEnvironmentVariable($wgName,'Process')
-        [Environment]::SetEnvironmentVariable($wgName,$wgEnvValues[$wgName],'Process')
+    foreach ($key in $envValues.Keys) {
+        $saved[$key] = [Environment]::GetEnvironmentVariable($key,'Process')
+        [Environment]::SetEnvironmentVariable($key,$envValues[$key],'Process')
     }
-    Invoke-WgGit -GitArguments @('-c','credential.helper=','push','-u','origin','main')
-    Write-Output "Published: https://github.com/$wgOwner/$wgRepository"
-    Invoke-WgGit -GitArguments @('log','-1','--format=%h %s')
-    Invoke-WgGit -GitArguments @('status','--short')
+    $transport = @('-c','credential.helper=','-c','http.followRedirects=false')
+    Invoke-GitChecked ($transport + @('fetch','--no-tags',$url,'refs/heads/main'))
+    $head = Invoke-GitChecked @('rev-parse','HEAD')
+    $upstream = Invoke-GitChecked @('rev-parse','FETCH_HEAD')
+    & git merge-base --is-ancestor $upstream $head
+    if ($LASTEXITCODE -ne 0) { throw 'Remote main is not an ancestor. Reconcile history before publishing.' }
+    $secrets = @($token)
+    if (Test-Path -LiteralPath (Join-Path $root 'config.json')) {
+        try { $dbPassword = (Get-Content -LiteralPath (Join-Path $root 'config.json') -Raw -Encoding UTF8 | ConvertFrom-Json).password }
+        catch { throw 'Cannot safely parse local config.json to check for leaked credentials.' }
+        if ($dbPassword) { $secrets += [string]$dbPassword }
+    }
+    $commits = @($head; Invoke-GitChecked @('rev-list',"$upstream..$head")) | Sort-Object -Unique
+    foreach ($commit in $commits) {
+        $paths = Invoke-GitChecked @('-c','core.quotepath=false','ls-tree','--full-tree','-r','--name-only',$commit)
+        foreach ($file in $paths) {
+            if ($file -match $privatePath) { throw "Sensitive/runtime path in commit: $file" }
+            $content = (Invoke-GitChecked @('show',"${commit}:$file")) -join "`n"
+            foreach ($secret in $secrets) {
+                if ($content.Contains($secret)) { throw "Credential detected in commit: $file" }
+            }
+        }
+    }
+    if ($CheckOnly) { Write-Output "Verified fast-forward destination and source-only commit: $head"; exit 0 }
+    if (!$oldUrl) { Invoke-GitChecked @('remote','add','origin',$url) }
+    Invoke-GitChecked ($transport + @('push','-u','origin','HEAD:refs/heads/main'))
+    $remote = Invoke-GitChecked ($transport + @('ls-remote','--exit-code','origin','refs/heads/main'))
+    if (($remote -split '\s+')[0] -ne $head) { throw 'The remote branch did not report the expected commit.' }
+    Write-Output "Published: https://github.com/$owner/$repository/commit/$head"
 } catch {
-    $wgFailure = $_.Exception.Message
-    if ($wgToken) { $wgFailure = $wgFailure.Replace($wgToken,'[REDACTED]') }
-    Write-Output "Publishing stopped: $wgFailure"
+    $detail = $_.Exception.Message
+    if ($token) { $detail = $detail.Replace($token,'[REDACTED]') }
+    [Console]::Error.WriteLine("Publishing stopped: $detail")
     exit 1
 } finally {
-    foreach ($wgName in $wgSavedEnv.Keys) { [Environment]::SetEnvironmentVariable($wgName,$wgSavedEnv[$wgName],'Process') }
-    $wgToken = $null
-    $wgCredentials = $null
+    foreach ($key in $saved.Keys) { [Environment]::SetEnvironmentVariable($key,$saved[$key],'Process') }
+    if ($locationSet) { Pop-Location }
 }

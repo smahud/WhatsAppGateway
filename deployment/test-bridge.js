@@ -1,17 +1,20 @@
 'use strict';
-const assert=require('assert/strict'),mysql=require('mysql2/promise');
-const cfg=require('../config.json'),{normalize,validate,tick}=require('./bridge');
+const assert=require('assert/strict');
+const {config,connect,assertRuntime}=require('./database');
+const {normalize,validate,tick}=require('./bridge');
 (async()=>{
  assert.equal(normalize('081234567890'),'6281234567890');
  assert.equal(normalize('+62 812-3456-7890'),'6281234567890');
  assert.throws(()=>normalize('123@lid'));
  assert.throws(()=>validate({destination:'081234567890',message:'x'.repeat(2001)}));
  assert.throws(()=>validate({destination:'081234567890',message:'abc',multipart:'true'}));
- const c=await mysql.createConnection({host:cfg.host,port:cfg.db_port,user:cfg.user,password:cfg.password,database:cfg.database,timezone:'+07:00'});
+  const cfg=config();
+  const c=await connect(cfg);
  try {
+   await assertRuntime(c,cfg.database);
   // Real capture trigger tested transactionally; neither message survives rollback.
   await c.beginTransaction();
-  const [r]=await c.query("INSERT INTO jbssms.outbox(InsertIntoDB,SendingDateTime,Text,DestinationNumber,CreatorID) VALUES(NOW(),DATE_ADD(NOW(),INTERVAL 1 DAY),'BRIDGE ROLLBACK TEST','081234567890','WAGW-INSTALL-TEST')");
+   const [r]=await c.query("INSERT INTO jbssms.outbox(InsertIntoDB,SendingDateTime,Text,DestinationNumber,CreatorID) VALUES(NOW(),DATE_ADD(NOW(),INTERVAL 1 DAY),'BRIDGE ROLLBACK TEST','081234567890','JIBAS-WG-INSTALL-TEST')");
   const [[captured]]=await c.execute('SELECT message FROM bridge_outgoing WHERE source_id=?',[r.insertId]);
   assert.equal(captured.message,'BRIDGE ROLLBACK TEST');
   await c.execute('UPDATE jbssms.outbox SET Text=? WHERE ID=?',['BRIDGE UPDATED',r.insertId]);
@@ -20,7 +23,7 @@ const cfg=require('../config.json'),{normalize,validate,tick}=require('./bridge'
   const [[gone]]=await c.execute('SELECT COUNT(*) AS n FROM bridge_outgoing WHERE source_id=?',[r.insertId]);assert.equal(gone.n,0);
   // Connection-local temporary tables shadow production: scheduler cannot see tests.
   for(const table of ['bridge_control','bridge_outgoing','outbox','sent']) {
-   const [[ddl]]=await c.query(`SHOW CREATE TABLE wagw.${table}`);
+    const [[ddl]]=await c.query(`SHOW CREATE TABLE ${table}`);
    await c.query(ddl['Create Table'].replace('CREATE TABLE','CREATE TEMPORARY TABLE'));
   }
   const [[sourceDdl]]=await c.query('SHOW CREATE TABLE jbssms.outbox');
@@ -38,7 +41,9 @@ const cfg=require('../config.json'),{normalize,validate,tick}=require('./bridge'
   const [[job]]=await c.query('SELECT * FROM bridge_outgoing');assert.equal(job.state,'queued');
   [[remaining]]=await c.query('SELECT COUNT(*) AS n FROM test_jibas_outbox');assert.equal(remaining.n,0);
   await c.execute("INSERT INTO sent(id,wa_no,wa_text,wa_time,status) VALUES(?,'6281234567890','TEST',NOW(),'sent')",[job.wagw_id]);
-  await step();const [[done]]=await c.query('SELECT state FROM bridge_outgoing');assert.equal(done.state,'sent');
+   await c.query('UPDATE bridge_control SET enabled=0');
+   await step();const [[done]]=await c.query('SELECT state FROM bridge_outgoing');assert.equal(done.state,'sent');
+   await c.query('UPDATE bridge_control SET enabled=1');
   await c.query("INSERT INTO test_jibas_outbox(ID,DestinationNumber,Text,CreatorID,SendingDateTime) VALUES(2,'bad','TEST','TEST',NOW())");
   await c.query("INSERT INTO bridge_outgoing(source_id,destination,message) VALUES(2,'bad','TEST')");await step();
   const [[bad]]=await c.query('SELECT state FROM bridge_outgoing WHERE source_id=2');assert.equal(bad.state,'rejected');

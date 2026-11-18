@@ -1,189 +1,147 @@
-# WAGW PRO — Integrasi Outbox SMS JIBAS
+# JIBAS WhatsApp Gateway (JIBAS WG)
 
-Repository: [smahud/WhatsAppGateway](https://github.com/smahud/WhatsAppGateway).
+JIBAS WG mengirim pesan dari menu **SMS JIBAS** melalui WhatsApp. Instalasi normal selalu memasang integrasi JIBAS dan mengaktifkan MOVE: `jbssms.outbox` → worker → `jibas_wg.outbox` → WhatsApp. Cakupan: satu akun WhatsApp dan pesan teks keluar. Pesan masuk, webhook inbox, dan fitur SMS interaktif tidak digantikan.
 
-Gateway WhatsApp berbasis Node.js/Baileys dengan bridge database untuk memindahkan pesan keluar JIBAS ke WAGW. Source JIBAS dipertahankan; integrasi berada di `deployment/` dan objek database tambahan. Perubahan WAGW dibatasi pada pemuatan driver sesuai kebutuhan serta pengaman reconnect/scheduler hasil audit.
+## Sebelum memasang
 
-## Status implementasi
+- Siapkan **JIBAS yang sudah berjalan**. `jbssms.outbox` harus InnoDB; database gateway dan `jbssms` harus berada di instance MySQL/MariaDB yang sama. Gunakan [akun database aplikasi](#akun-database-jibas).
+- Cadangkan DB/config/sesi dan hentikan consumer SMS lama sebelum mengaktifkan MOVE. Jika ada pesan lama yang belum tercatat oleh trigger, installer normal berhenti tanpa memindahkannya. Gunakan `--no-activate-move` untuk staging.
+- Untuk instalasi pertama: **clone atau unduh dan ekstrak ZIP → salin dan edit `config.json` → jalankan installer**. Node.js/dependensi disiapkan installer; tidak perlu menjalankan `npm ci` secara manual.
 
-### Instalasi Linux otomatis
+## Windows
 
-Untuk Ubuntu/Debian dengan systemd, clone repository lalu jalankan:
+Gunakan PowerShell **Administrator** dari folder khusus proyek di luar profil pengguna, misalnya `C:\JIBAS_WG`. Installer membatasi izin folder proyek untuk Administrator, SYSTEM, dan `LocalService`.
+
+```powershell
+# Pilihan jika memakai Git; lewati jika sudah mengekstrak ZIP.
+git clone https://github.com/smahud/WhatsAppGateway.git C:\JIBAS_WG
+Set-Location C:\JIBAS_WG
+if (!(Test-Path .\config.json)) { Copy-Item .\config.example.json .\config.json }
+notepad.exe .\config.json
+```
+
+Isi `host`, `db_port`, `user`, dan `password` sesuai **database JIBAS**. Untuk instalasi baru gunakan `db_type: "mysql"` dan `database: "jibas_wg"`. `port` (default `3000`) adalah port **dashboard**, bukan port DB. Simpan file, lalu jalankan:
+
+```powershell
+.\Install_to_Windows_Service.bat
+```
+
+Jika pemasangan pertama tanpa opsi login, installer mencetak `admin` dan password acak **sekali** di terminal. Simpan password tersebut. Buka **http://127.0.0.1:3000/login** (ganti port jika diubah). Setelah login berhasil, aplikasi membuka dashboard. Dashboard Windows hanya tersedia di localhost.
+
+```powershell
+# Install/repair dan tetapkan login baru:
+.\Install_to_Windows_Service.bat --user admin --pass "GANTI_DENGAN_PASSWORD_KUAT"
+
+# Staging JIBAS: pasang trigger tetapi jangan pindahkan antrean baru:
+.\Install_to_Windows_Service.bat --no-activate-move
+
+# Ganti login saja, tanpa restart dan tanpa mengubah DB:
+.\Install_to_Windows_Service.bat --credentials-only --user operator --pass-file "C:\Private\jibas-wg.pass"
+
+# Lepas Windows Service; tidak menghapus konfigurasi, login, sesi, atau data:
+.\Uninstall_Windows_Service.bat
+```
+
+## Ubuntu/Debian
+
+Perlu systemd, `sudo`, Internet untuk dependensi, Python 3, dan `ss` dari `iproute2` (umumnya tersedia di instalasi standar). Bila sistem minimal belum punya keduanya: `sudo apt-get install -y python3 iproute2`. Gunakan clone atau ekstrak ZIP:
 
 ```bash
-git clone https://github.com/smahud/WhatsAppGateway.git
-cd WhatsAppGateway
-sudo bash install.sh --port 3000 --user admin --pass somepassword
+# Pilihan jika memakai Git; lewati jika sudah mengekstrak ZIP.
+git clone https://github.com/smahud/WhatsAppGateway.git jibas-wg
+cd jibas-wg
+test -f config.json || cp config.example.json config.json
+nano config.json
 ```
 
-Ganti `somepassword` dengan password dashboard pilihan Anda. `--user`/`--pass` adalah login dashboard, **bukan** kredensial database. Password CLI dapat tercatat di shell history; alternatifnya gunakan `--pass-file /root/wagw-dashboard.pass`. Jika `--pass` tidak diberikan pada instalasi pertama, password acak dibuat dan ditampilkan sekali; instalasi berikutnya mempertahankan password lama.
+Isi `host`, `db_port`, `user`, dan `password` sesuai **database JIBAS**. Untuk instalasi baru gunakan `db_type: "mysql"` dan `database: "jibas_wg"`. `port` (default `3000`) adalah **port HTTPS dashboard**; port backend privat dipilih installer. Simpan file, lalu jalankan:
 
-Installer memasang paket OS, runtime Node.js khusus WAGW (tanpa mengganti Node aplikasi lain), dependency, schema/trigger WAGW, dua layanan startup, serta reverse proxy Nginx dengan HTTPS dan login. Source dipasang ke `/opt/wagw`. Bila `config.json` belum tersedia, installer meminta host, port, user, dan password **database JIBAS yang sudah ada** satu kali. `jbssms` dan `wagw` wajib berada pada instance DB yang sama; installer tidak memasang atau membuat JIBAS dari nol.
-
-Sesudah berhasil, buka:
-
-```text
-https://IP_SERVER:3000
+```bash
+sudo bash install.sh
 ```
 
-Login sebagai `admin` dengan password yang diberikan, lalu scan QR WhatsApp. Sertifikat awal self-signed; cocokkan fingerprint yang dicetak installer sebelum mempercayainya. Permintaan HTTP biasa diarahkan ke HTTPS pada port yang sama. Jika VPS memakai NAT, tentukan alamat publik dengan `--address IP_PUBLIK`. Buka port tersebut pada firewall provider; UFW yang sudah aktif diberi aturan untuk port pilihan tanpa mengaktifkan/reset firewall.
+Untuk instalasi baru, installer memasang gateway dan worker di `/opt/jibas-wg`, serta Nginx untuk HTTPS. Pada pemasangan pertama tanpa opsi login, simpan password acak untuk `admin` yang ditampilkan terminal. Buka **https://IP_SERVER:3000/login**. Cocokkan fingerprint sertifikat awal yang dicetak installer. Untuk VPS dengan NAT gunakan `--address IP_PUBLIK_ATAU_DNS` saat install. Izinkan port HTTPS pada firewall provider; jangan mengekspos backend atau MySQL.
 
-`--port 8080` menghasilkan `https://IP_SERVER:8080`. Port backend dipilih terpisah dan hanya mendengarkan di localhost. Mode MOVE aktif secara default: **hentikan consumer SMS lama sebelum memasang**. Untuk staging tanpa perpindahan pesan, tambahkan `--no-activate-move`. Installer menolak reinstall saat layanan WAGW masih aktif; pause, drain antrean, dan hentikan layanan dalam maintenance dahulu.
+```bash
+# Install/repair dengan login baru dan port HTTPS tertentu:
+sudo bash install.sh --port 8443 --user admin --pass-file /root/jibas-wg.pass
 
-Panduan lengkap dan hak akses DB: [deployment/VPS.md](deployment/VPS.md). [Pengujian Ubuntu 24.04](https://github.com/smahud/WhatsAppGateway/actions/runs/43679657986) telah lulus untuk dependency minimal, Bash/CLI, konfigurasi, serta HTTPS/login Nginx nyata. Instalasi penuh dan reboot dengan database produksi tetap perlu diuji pada VPS tujuan.
+# Staging JIBAS: pasang trigger tetapi jangan pindahkan antrean baru:
+sudo bash install.sh --no-activate-move
 
-Lingkup release ini: **satu akun WhatsApp, outbox teks JIBAS, mode move**. Tidak memerlukan Chrome, Playwright, atau Puppeteer. Koneksi WhatsApp memakai Baileys pihak ketiga, bukan WhatsApp Business Platform resmi Meta.
+# Ganti login saja:
+sudo bash install.sh --credentials-only --user operator --pass-file /root/jibas-wg.pass
 
-**Untuk VPS Linux, mulai dari [deployment/VPS.md](deployment/VPS.md).** Hasil dan batas audit tersedia di [deployment/AUDIT.md](deployment/AUDIT.md). Pemeriksaan Ubuntu CI sudah lulus; pemasangan penuh systemd, reboot dan DB tujuan masih memerlukan uji staging.
-
-- **Outbox: move aktif.** Ketika jadwalnya tiba, pesan dimasukkan ke antrean WAGW dan dihapus dari antrean JIBAS dalam satu transaksi.
-- **Inbox: nonaktif.** Sinkronisasi pesan baru dan penghapusan dua arah belum diimplementasikan sebagai fitur yang siap digunakan.
-- Riwayat `jbssms.outboxhistory` tetap dipertahankan.
-- Instalasi lokal telah diuji pada Windows, Node.js 22.14.0, dan MariaDB 10.4.32 di port 3434.
-- Pemasangan startup otomatis masih memerlukan Administrator; percobaan sesi awal ditolak Windows dan reboot belum diuji.
-
-## Alur pesan
-
-```text
-JIBAS membuat jbssms.outbox
-  -> trigger mencatat wagw.bridge_outgoing
-  -> worker menunggu jadwal, mengunci sumber, memvalidasi pesan
-  -> satu transaksi:
-       INSERT wagw.outbox
-       UPDATE referensi/status bridge
-       DELETE jbssms.outbox
-  -> WAGW mengirim WhatsApp
-  -> wagw.sent -> status bridge
+# Lepas unit JIBAS WG dan konfigurasi Nginx miliknya; simpan data:
+sudo bash uninstall.sh
 ```
 
-Mode ini memindahkan **antrean**, bukan menunggu pesan diterima HP. Pengiriman WhatsApp mengikuti scheduler WAGW. Jangan menjalankan consumer SMS lama pada antrean yang sama.
+## Login dan perbaikan
 
-## Struktur
+| Opsi login | Instalasi baru | Instalasi yang sudah ada |
+| --- | --- | --- |
+| Tidak ada | `admin` + password acak | Pertahankan username dan password yang tersimpan |
+| `--user NAMA` | NAMA + password acak | Ganti username dan buat password acak baru |
+| `--pass …` atau `--pass-file PATH` | `admin` + password pilihan | Pertahankan username; ganti password |
+| `--user` dan `--pass`/`--pass-file` | Gunakan keduanya | Ganti keduanya |
 
-| Lokasi | Fungsi |
-| --- | --- |
-| `wabot.js`, `public/` | Backend dan dashboard WAGW; backend memakai pemuatan driver sesuai kebutuhan |
-| `create tables/` | Schema database bawaan; mengandung DROP TABLE |
-| `deployment/start-wagw.js` | Adapter port MySQL tanpa mengedit source gateway |
-| `deployment/bridge.js` | Worker pemindahan outbox dan validasi |
-| `deployment/bridge-schema.sql`, `setup-bridge.js` | Tabel kontrol/audit dan trigger database |
-| `deployment/deploy.js` | Bootstrap database tanpa mengimpor ulang tabel yang sudah ada |
-| `deployment/supervisor.js` | Menjalankan gateway/bridge dan memulai ulang child yang berhenti |
-| `deployment/Start-WAGW.ps1`, `Stop-WAGW.ps1` | Kontrol proses lokal |
-| `deployment/Install-Autostart.ps1` | Pendaftaran Task Scheduler saat startup |
-| `deployment/test-bridge.js` | Uji transaksi dan perilaku bridge |
-| `config.example.json` | Contoh konfigurasi tanpa kredensial |
-| `CONTRACT.md` | Kontrak perilaku, batas perubahan, dan kriteria verifikasi |
+`--pass-file` menggunakan file privat UTF-8 satu baris dan menghindari password di shell history. Mengganti login memutus sesi dashboard lama, **bukan** sesi WhatsApp. Autentikasi berjalan melalui halaman `/login`, bukan dialog Basic Auth browser. Pengguna Linux lama dengan login Nginx bcrypt dapat menjalankan installer normal tanpa opsi login untuk memindahkan login lama.
 
-## Instalasi Windows atau manual
+**Jika port dipakai aplikasi lain**, installer berhenti sebelum pemasangan runtime/dependensi. Ubah `port` di `config.json` (bukan `db_port`), lalu jalankan ulang. Di Linux boleh memakai `--port`. **Jika port milik instalasi gateway yang sama**, installer memeriksa kepemilikan port dan DB, lalu melakukan restart terkontrol. Config, kredensial, sesi, dan antrean dipertahankan.
 
-Jalankan dari direktori proyek. Siapkan Node.js dan npm, MariaDB/MySQL, serta database JIBAS `jbssms` yang sudah tersedia pada server yang sama dengan `wagw`.
+### Upgrade dari instalasi lama
+
+- **Jangan ganti `database: "wagw"` pada konfigurasi lama.** Ini adalah nama schema kompatibilitas, bukan nama aplikasi. Installer menjaga schema, trigger, dan antrean lama; tidak membuat jalur MOVE kedua.
+- **Windows:** perbarui source di folder instalasi lama tanpa menimpa `config.json`, `dashboard-auth.json`, atau `sessions/`. Rerun installer di folder yang sama untuk mengganti registrasi yang terverifikasi dari `wagwpro.exe` menjadi `JIBAS_WG.exe`.
+- **Linux:** jalankan installer baru dari checkout/ZIP. Jika sudah terpasang di `/opt/wagw`, biarkan data di lokasi itu; unit dan konfigurasi Nginx diperbarui ke nama JIBAS WG. Gunakan `config.json` lama, atau biarkan installer memakai config terpasang. Lihat [panduan VPS](deployment/VPS.md#repair-rotasi-dan-uninstall).
+
+## Cara pakai dari JIBAS
+
+1. Login ke dashboard dan buka **Status JIBAS**. Tautkan akun melalui **WhatsApp → Perangkat tertaut** jika QR muncul.
+2. Pastikan worker siap, MOVE aktif, dan WhatsApp terhubung. Kirim satu pesan teks dari **menu SMS JIBAS** ke nomor tester yang mengizinkan pengujian. Menu uji langsung di dashboard bukan pengujian alur JIBAS.
+3. Pantau Outbox dan Sent. Pesan terjadwal baru berpindah pada waktunya. `sent` berarti library melaporkan pengiriman berhasil, bukan bukti pesan diterima atau dibaca. Konfirmasi di perangkat tujuan.
+
+Jika instalasi ditahan karena antrean lama, gunakan staging `--no-activate-move`, lihat `uncaptured` pada `doctor.js`, lalu tinjau pesan bersama operator JIBAS. Setelah consumer SMS lama dihentikan dan antrean direkonsiliasi:
 
 ```powershell
-npm ci --omit=optional
-Copy-Item config.example.json config.json
+# Windows: gunakan node portable jika ada; jika tidak, pakai runtime installer.
+$Node = if (Test-Path .\node.exe) { '.\node.exe' } elseif (Test-Path .\.runtime\node\node.exe) { '.\.runtime\node\node.exe' } else { 'node.exe' }
+& $Node .\deployment\doctor.js
+& $Node .\deployment\activate.js
 ```
 
-Untuk instalasi portable, sediakan `node.exe` di root proyek. Skrip PowerShell menggunakan executable tersebut. `node.exe` dan `node_modules` tidak disimpan di Git. Gunakan runtime dan dependency native yang sesuai Windows/arsitektur mesin tujuan.
-
-Profil minimal di atas untuk MySQL/outbox teks. Driver lain dan binary media opsional tidak ikut dipasang. Jika perlu engine lain, pasang dependency optional yang bersangkutan dan uji pada OS tujuan; jangan menyalin node_modules Windows ke Linux.
-
-Edit `config.json` dengan host, `db_port`, user, dan password yang benar. `port` adalah port dashboard; `db_port` adalah port MySQL. Nama database integrasi saat ini harus `wagw` dan sumber harus `jbssms`.
-
-```powershell
-.\node.exe .\deployment\deploy.js
+```bash
+# Linux
+sudo -u jibas-wg /opt/jibas-wg-runtime/node/bin/node /opt/jibas-wg/deployment/doctor.js
+sudo -u jibas-wg /opt/jibas-wg-runtime/node/bin/node /opt/jibas-wg/deployment/activate.js
 ```
 
-Bootstrap hanya mengekstrak CREATE TABLE dari schema asli ketika database WAGW belum berisi tabel; tidak menjalankan DROP dalam dump. Jika struktur database lama tidak sesuai, instalasi berhenti untuk pemeriksaan. Migrasi memperlebar `sent.status` menjadi 20 karakter agar `failed` muat. Ambil backup sebelum deployment pada instalasi lama. Tabel perpindahan harus InnoDB dan `jbssms`/`wagw` harus berada pada instance database yang sama.
+`pause.js` menjeda transfer baru; pesan yang sudah di antrean gateway tidak dibatalkan. Uninstall tidak melepas trigger atau mengembalikan pesan yang sudah dipindahkan. Jika ingin beralih kembali ke SMS lama, ikuti [rollback JIBAS](CONTRACT.md#penghentian-dan-rollback).
 
-Setelah memastikan consumer SMS lama tidak mengambil antrean tersebut, aktifkan melalui SQL:
+## Akun database JIBAS
+
+Contoh untuk instalasi baru ketika JIBAS WG dan MariaDB berada pada mesin yang sama. Ganti password dan host akun jika gateway berada di mesin lain:
 
 ```sql
-UPDATE wagw.bridge_control
-SET enabled=1, mode='whatsapp', inbox_enabled=0
-WHERE id=1;
+CREATE DATABASE IF NOT EXISTS jibas_wg CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'jibas_wg_app'@'127.0.0.1' IDENTIFIED BY 'GANTI_DENGAN_PASSWORD_DB_KUAT';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER ON jibas_wg.* TO 'jibas_wg_app'@'127.0.0.1';
+GRANT SELECT, DELETE, TRIGGER ON jbssms.outbox TO 'jibas_wg_app'@'127.0.0.1';
 ```
+
+Jangan impor dump `create tables/` ke database aktif; berkas asli mengandung `DROP TABLE`. Installer hanya memakai CREATE yang diperlukan, memasang trigger tanpa mengganti trigger berbeda, dan tidak menghapus riwayat `jbssms.outboxhistory`.
+
+## Referensi dan diagnosa
+
+- [Windows](deployment/WINDOWS.md): status service, log, dan perbaikan.
+- [Linux](deployment/VPS.md): akses VPS, HTTPS, dan journal systemd.
+- [Alur dan batas JIBAS](deployment/OUTBOX.md), [kontrak](CONTRACT.md), dan [audit](deployment/AUDIT.md).
+- Windows `daemon/logs/`; Linux `sudo journalctl -u jibas-wg-gateway -u jibas-wg-bridge -n 60 --no-pager`.
+
+Paket source Windows/Linux tanpa kredensial, sesi, atau runtime dapat dibangun dengan:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\deployment\Start-WAGW.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\deployment\Build-Release.ps1
 ```
 
-Buka **http://localhost:3000**, lalu tautkan WhatsApp melalui QR. Sesi tersimpan dalam `sessions/`; biasanya tidak perlu scan ulang selama sesi tetap valid. Jangan menjalankan launcher/service bawaan bersamaan karena tidak memuat adapter port.
-
-## Startup Windows
-
-Di PowerShell **Administrator**, dari direktori proyek:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\deployment\Install-Autostart.ps1
-```
-
-Skrip mendaftarkan task `WAGW-JIBAS-Bridge` sebagai SYSTEM saat boot. Task belum terpasang pada sesi awal. Setelah pemasangan, uji reboot, akses direktori proyek, kesiapan database, dan pemulihan sesi WhatsApp. Supervisor mengulang child yang berhenti; kegagalan inisialisasi database pada gateway yang tetap hidup masih perlu dipantau.
-
-## Operasional dan pemeriksaan
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\deployment\Stop-WAGW.ps1
-.\node.exe .\deployment\test-bridge.js
-.\node.exe .\deployment\test-deployment.js
-.\node.exe .\deployment\doctor.js
-Invoke-RestMethod http://localhost:3000/api/status
-```
-
-Test memakai transaksi rollback pada capture serta tabel sementara untuk pengujian perpindahan; tidak mengirim pesan WhatsApp. Gunakan kredensial pengujian yang sesuai karena tes membutuhkan akses schema dan tabel sumber.
-
-```sql
-SELECT * FROM wagw.bridge_control;
-SELECT id,source_id,state,wagw_id,scheduled_at,error
-FROM wagw.bridge_outgoing ORDER BY id DESC LIMIT 100;
-
--- Jeda transfer baru; pesan yang sudah di WAGW tetap diproses:
-UPDATE wagw.bridge_control SET enabled=0 WHERE id=1;
-```
-
-Log berada di `deployment/gateway.log`, `bridge.log`, `supervisor.log`, dan `supervisor-error.log`. Jangan memakai `STOP.bat` bawaan: skrip tersebut mematikan semua `node.exe`.
-
-## Batas yang perlu diketahui
-
-Driver database dimuat ketika `db_type` tersebut dipakai, termasuk saat tes koneksi. Pada startup MySQL, driver Oracle, SQL Server, SQLite, dan ODBC tidak dimuat. Driver yang pernah dipakai tetap berada dalam cache Node.js sampai proses di-restart; dependensi tetap tercantum di package.json untuk mempertahankan dukungan engine lain. Uji tanpa koneksi nyata: `.\node.exe .\deployment\test-db-loading.js`.
-
-- Tidak ada replay otomatis antrean sebelum trigger terpasang.
-- Pesan kosong, nomor tidak valid, multipart/PDU, teks di atas 2000 karakter, dan awalan perintah khusus WAGW ditolak, bukan dihapus dari sumber.
-- Edit sebelum transfer mengikuti sumber terbaru. Setelah transfer, perubahan riwayat JIBAS tidak mengubah pesan WAGW.
-- `sent` berarti pengiriman berhasil menurut library, bukan bukti penerimaan atau pembacaan di HP.
-- Tidak ada retry pengiriman otomatis. Crash gateway setelah mengirim tetapi sebelum mencatat hasil masih berpotensi menghasilkan kiriman ulang.
-- Perintah otomatis SMS, PIN/nilai, kritik/saran, dan seluruh fitur SMS server lama belum dinyatakan kompatibel.
-- API gateway asli belum memiliki autentikasi. Batasi akses dashboard/API pada lingkungan yang dipercaya; jangan mengeksposnya langsung ke internet.
-
-Launcher deployment kini membatasi dashboard ke `127.0.0.1`, memeriksa database sebelum memulai WhatsApp, serta mencegah gateway kedua mengambil antrean yang sama melalui named lock. Akses dashboard VPS lewat SSH tunnel. Scheduler outbox dijaga tetap satu ketika reconnect; DB sehat tidak diinisialisasi ulang pada setiap reconnect WhatsApp.
-
-## Git dan data lokal
-
-Repository menyimpan source, dokumentasi, schema, dan contoh konfigurasi. Kredensial `config.json`, sesi WhatsApp, database, log, PID, backup lokal, dan executable tidak dilacak. Setelah clone, konfigurasi dan runtime perlu disiapkan lagi. Jangan menambahkan file tersebut dengan `git add -f`.
-
-Tidak ada remote yang otomatis dibuat atau dipublikasikan. Ketentuan lisensi proyek asli belum ditemukan; dokumentasi ini tidak memberikan lisensi baru atas source tersebut.
-
-Repository lokal menggunakan branch `main` dan commit awal sudah tersedia. Perubahan audit berikutnya perlu diperiksa dan di-commit sebelum dijadikan release Git. Dari terminal lokal yang dapat menulis repository:
-
-```powershell
-git status --short
-git add .
-git diff --cached --stat
-git commit -m "Harden WAGW JIBAS deployment and add VPS installer"
-```
-
-Jika Git meminta identitas, atur `user.name` dan `user.email` milik Anda pada repository sebelum commit.
-
-### Publikasi ke repository GitHub yang sudah ada
-
-Pastikan repository tujuan berada pada akun `smahud` dan PAT memiliki akses tulis ke repository tersebut. Nama repo tidak harus sama dengan direktori proyek. Konfigurasi PAT dibaca dari `Documents/github.pat.json` pada properti `smahud`, bukan disalin ke dalam proyek.
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\deployment\Publish-GitHub.ps1 -Repository WhatsAppGateway
-```
-
-Skrip memverifikasi akun, memeriksa kandidat file terhadap kredensial lokal, membuat commit jika ada perubahan, dan push branch `main` tanpa force. Token hanya digunakan dalam header proses; tidak ditulis ke URL origin atau konfigurasi Git. Repository yang tidak ditemukan/diizinkan menyebabkan proses berhenti. Repo baru hanya dibuat jika operator secara eksplisit menambahkan `-CreatePrivateRepository`; repo public memerlukan `-AllowPublic` setelah isi diperiksa.
-
-Repository GitHub private perlu diizinkan pada PAT yang digunakan dan, jika memakai koneksi GitHub ChatGPT, pada koneksi tersebut juga. Menyiapkan file atau commit lokal tidak membuktikan push berhasil; verifikasi commit di GitHub sebelum deployment.
-
-Catatan teknis lebih lanjut: [deployment/OUTBOX.md](deployment/OUTBOX.md). Kontrak implementasi: [CONTRACT.md](CONTRACT.md).
+Jangan sertakan `config.json`, `dashboard-auth.json`, `.runtime/`, `sessions/`, database, log, atau PAT dalam Git. Untuk publikasi yang diizinkan ke repository pemilik proyek, commit hanya source yang ditinjau, lalu gunakan `deployment/Publish-GitHub.ps1` sesuai [kontrak publikasi](CONTRACT.md#kontrak-publikasi-git). Installer tidak melakukan commit atau push.

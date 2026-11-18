@@ -1,10 +1,12 @@
 @echo off
-title Uninstall WAGW PRO Service
-echo ===================================================
-echo Menghapus Windows Service WAGW PRO...
-echo Akan muncul jendela prompt dari Windows "User Account Control (UAC)".
-echo Silakan klik "Yes" untuk menghapus WAGW PRO.
-echo ===================================================
-cd /d "%~dp0"
-node Uninstall_Service.js
-pause
+setlocal DisableDelayedExpansion
+if /i "%~1"=="--help" (
+    echo JIBAS WhatsApp Gateway - hapus service tanpa menghapus DB, sesi, config, atau login.
+    exit /b 0
+)
+if not "%~1"=="" (
+    echo Opsi tidak dikenal. Gunakan Uninstall_Windows_Service.bat --help.
+    exit /b 1
+)
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0deployment\windows\manage-service.ps1" -Action Uninstall
+exit /b %errorlevel%

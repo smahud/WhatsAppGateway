@@ -36,13 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const no = document.getElementById('send-no').value;
             const text = document.getElementById('send-text').value;
-            const media = document.getElementById('send-media').value;
-            const file = document.getElementById('send-file').value;
-            
-            const payload = {no};
-            if(text) payload.text = text;
-            if(media) payload.media = media;
-            if(file) payload.file = file;
+            const payload = {no,text};
             if(document.getElementById('send-smart').checked) payload.filterOnline = true;
 
             const res = await fetch('/api/send', {
@@ -117,9 +111,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await res.json();
             
             if(data.success) {
-                resultDiv.innerHTML = `<i class="fa-solid fa-check"></i> ${data.message} (${finalPayloadBatch.length} Nomor diproses)`;
+                resultDiv.textContent = `${data.message} (${finalPayloadBatch.length} Nomor diproses)`;
             } else {
-                resultDiv.innerHTML = `<span style="color:var(--danger)">Error: ${data.error}</span>`;
+                resultDiv.textContent = `Error: ${data.error}`;
             }
         } catch(err) {
             resultDiv.innerHTML = `<span style="color:var(--danger)">Connection error.</span>`;
@@ -136,16 +130,9 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Saving...`;
         
         const payload = {
-            db_type: document.getElementById('cfg-db_type').value,
-            host: document.getElementById('cfg-host').value,
-            database: document.getElementById('cfg-db').value,
-            user: document.getElementById('cfg-user').value,
-            delay: parseInt(document.getElementById('cfg-delay').value),
-            webhook_url: document.getElementById('cfg-webhook').value,
-            bot_exe: document.getElementById('cfg-botexe').value
+            ...databaseForm(),
+            delay: Number(document.getElementById('cfg-delay').value)
         };
-        const pass = document.getElementById('cfg-pass').value;
-        if(pass) payload.password = pass;
 
         try {
             const res = await fetch('/api/config', {
@@ -193,13 +180,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 data.results.forEach(r => {
                     if(r.exists) {
-                        htmlOut += `<div style="padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);"><i class="fa-solid fa-check-circle" style="color:var(--success)"></i> <b>${r.num}</b> - Terdaftar (JID: ${r.jid})</div>`;
+                         htmlOut += `<div style="padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);"><i class="fa-solid fa-check-circle" style="color:var(--success)"></i> <b>${escapeMessageField(r.num)}</b> - Terdaftar (JID: ${escapeMessageField(r.jid)})</div>`;
                         rawCopy += `${r.num}\tTerdaftar\t${r.jid}\n`;
                     } else if(r.error) {
-                        htmlOut += `<div style="padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);"><i class="fa-solid fa-triangle-exclamation" style="color:#f39c12"></i> <b>${r.num}</b> - Error: ${r.error}</div>`;
+                         htmlOut += `<div style="padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);"><i class="fa-solid fa-triangle-exclamation" style="color:#f39c12"></i> <b>${escapeMessageField(r.num)}</b> - Error: ${escapeMessageField(r.error)}</div>`;
                         rawCopy += `${r.num}\tError\t${r.error}\n`;
                     } else {
-                        htmlOut += `<div style="padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);"><i class="fa-solid fa-circle-xmark" style="color:var(--danger)"></i> <b>${r.num}</b> - TIDAK Terdaftar</div>`;
+                         htmlOut += `<div style="padding:8px; border-bottom:1px solid rgba(255,255,255,0.1);"><i class="fa-solid fa-circle-xmark" style="color:var(--danger)"></i> <b>${escapeMessageField(r.num)}</b> - TIDAK Terdaftar</div>`;
                         rawCopy += `${r.num}\tTIDAK Terdaftar\t-\n`;
                     }
                 });
@@ -211,7 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if(data.results.length > 0) btnCopy.style.display = 'inline-block';
                 
             } else {
-                resDiv.innerHTML = `<strong>Error:</strong> ${data.error || 'Server error'}`;
+                resDiv.textContent = `Error: ${data.error || 'Server error'}`;
                 resDiv.style.backgroundColor = 'rgba(231, 76, 60, 0.1)';
                 resDiv.style.border = '1px solid var(--danger)';
             }
@@ -241,10 +228,10 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             const data = await res.json();
             if(data.success) {
-                resDiv.innerHTML = `<strong>Status:</strong> ${data.presence}<br><strong>Terakhir Dilihat:</strong> ${data.lastSeen ? new Date(data.lastSeen*1000).toLocaleString() : 'Disembunyikan target'}`;
+                resDiv.textContent = `Status: ${data.presence} · Terakhir dilihat: ${data.lastSeen ? new Date(data.lastSeen*1000).toLocaleString() : 'Disembunyikan target'}`;
                 resDiv.style.color = "var(--success)";
             } else {
-                resDiv.innerHTML = `<span style="color:var(--danger)">Error: ${data.error}</span>`;
+                resDiv.textContent = `Error: ${data.error}`;
             }
         } catch(e) {
             resDiv.innerHTML = `<span style="color:var(--danger)">Connection Timeout.</span>`;
@@ -272,10 +259,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify({no})
             });
             const data = await res.json();
-            if(data.success) {
-                resDiv.innerHTML = `<img src="${data.url}" style="max-width:150px; border-radius:50%; border:3px solid #1abc9c;"><br>Berhasil ditarik.`;
+            if(data.success && URL.canParse(data.url) && new URL(data.url).protocol === "https:") {
+                const image = document.createElement('img');
+                image.alt = 'Foto profil WhatsApp';
+                image.src = data.url;
+                image.style.cssText = 'max-width:150px;border-radius:50%;border:3px solid #1abc9c';
+                resDiv.replaceChildren(image);
             } else {
-                resDiv.innerHTML = `<span style="color:var(--danger)">Error/Privasi: ${data.error}</span>`;
+                resDiv.textContent = data.error || 'Foto profil tidak tersedia.';
             }
         } catch(e) {
             resDiv.innerHTML = `<span style="color:var(--danger)">Connection Error.</span>`;
@@ -303,20 +294,23 @@ document.addEventListener("DOMContentLoaded", () => {
                 if(data.groups.length === 0) {
                      resDiv.innerHTML = "Tidak ada grup yang Anda ikuti saat ini.";
                 } else {
-                     let html = `<b>Ditemukan ${data.groups.length} Grup:</b><br><br>`;
-                     let raw = "";
-                     window._latestGroupData = {};
-                     data.groups.forEach(g => {
-                         window._latestGroupData[g.id] = g.participants;
-                         html += `<div><strong>${g.subject}</strong><br><span style="color:#2ecc71;">ID:</span> <code>${g.id}</code> (${g.participants_count} anggota)<br><button type="button" class="btn btn-secondary" style="padding:2px 8px; font-size:0.75rem; margin-top:5px; margin-bottom:5px;" onclick="viewGroupMembers('${g.id}', '${g.subject.replace(/'/g, "\\'")}')"><i class="fa-solid fa-address-book"></i> Lihat List Member</button></div><hr style="border-color:#333">`;
-                         raw += `${g.id}\n`;
-                     });
-                     resDiv.innerHTML = html;
-                     window._latestGroupResults = raw;
+                     resDiv.textContent = `Ditemukan ${data.groups.length} grup:`;
+                     for (const group of data.groups) {
+                         const row = document.createElement('p');
+                         row.textContent = `${group.subject} (${group.id}, ${group.participants_count} anggota) `;
+                         const members = document.createElement('button');
+                         members.type = 'button';
+                         members.className = 'btn btn-secondary';
+                         members.textContent = 'Lihat anggota';
+                         members.addEventListener('click', () => viewGroupMembers(group));
+                         row.appendChild(members);
+                         resDiv.appendChild(row);
+                     }
+                     window._latestGroupResults = data.groups.map(group => group.id).join('\n');
                      btnCopy.style.display = 'inline-block';
                 }
             } else {
-                resDiv.innerHTML = `<span style="color:var(--danger)">Error: ${data.error}</span>`;
+                resDiv.textContent = `Error: ${data.error}`;
             }
         } catch(e) {
             resDiv.innerHTML = `<span style="color:var(--danger)">Connection Error.</span>`;
@@ -375,28 +369,25 @@ function copyGroupResults() {
     }
 }
 
-function viewGroupMembers(id, subject) {
-    if(!window._latestGroupData || !window._latestGroupData[id]) return;
-    const parts = window._latestGroupData[id];
-    let listContent = `<div style="margin-bottom:10px;"><button class="btn btn-primary" style="font-size:0.8rem; padding:4px 8px;" onclick="copyGroupMembers('${id}')"><i class="fa-solid fa-copy"></i> Salin Semua Nomor</button></div>`;
-    parts.forEach(p => {
-        let no = p.id.split('@')[0];
-        let role = p.admin ? ` <span style="background:var(--primary); color:#fff; padding:1px 5px; border-radius:3px; font-size:0.7rem;">${p.admin}</span>` : "";
-        listContent += `<div style="padding:3px 0; border-bottom:1px dashed #444;">${no}${role}</div>`;
+function viewGroupMembers(group) {
+    const numbers = (group.participants || []).map(member => String(member.id).split('@')[0]);
+    const copy = document.createElement('button');
+    copy.className = 'btn btn-primary';
+    copy.textContent = 'Salin semua nomor';
+    copy.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(numbers.join('\n')); }
+        catch { alert('Tidak dapat menyalin.'); }
     });
-    
+    const list = document.createElement('ul');
+    numbers.forEach(number => {
+        const item = document.createElement('li');
+        item.textContent = number;
+        list.appendChild(item);
+    });
+    document.querySelector('#msgModal h3').textContent = `Anggota: ${group.subject}`;
+    document.getElementById('msgModalBody').replaceChildren(copy, list);
     document.getElementById('msgModal').style.display = 'block';
     document.getElementById('modalOverlay').style.display = 'block';
-    document.querySelector('#msgModal h3').innerHTML = `Anggota: ${subject}`;
-    document.getElementById('msgModalBody').innerHTML = listContent;
-}
-
-function copyGroupMembers(id) {
-    if(!window._latestGroupData || !window._latestGroupData[id]) return;
-    const texts = window._latestGroupData[id].map(p => p.id.split('@')[0]).join('\n');
-    navigator.clipboard.writeText(texts).then(() => {
-        alert("Semua nomor tersalin ke Clipboard!");
-    });
 }
 
 function toggleSendMode(mode) {
@@ -429,12 +420,23 @@ function loadPageData(pageId) {
 async function loadStatus() {
     try {
         const res = await fetch('/api/status');
+        if (res.status === 401) {
+            window.location.replace('/login');
+            return;
+        }
         const data = await res.json();
         
         const ind = document.querySelector('.dot');
         const txt = document.getElementById('conn-text');
         const qrBox = document.getElementById('qr-container');
         const verBadge = document.getElementById('app-ver-badge');
+        const jibas = data.jibas;
+        document.getElementById('jibas-status').textContent = !jibas
+            ? 'Status bridge JIBAS belum tersedia pada proses ini.'
+            : jibas.maintenance ? 'JIBAS: mode diagnostik; worker tidak memindahkan pesan.'
+            : !jibas.workerRunning ? 'JIBAS: worker belum siap. Periksa log layanan.'
+            : jibas.moveEnabled ? 'JIBAS: worker siap · MOVE aktif.'
+            : 'JIBAS: worker siap · MOVE dijeda.';
         
         if (verBadge && data.version) verBadge.innerText = `Ver ${data.version}`;
 
@@ -457,22 +459,30 @@ async function loadStatus() {
             ind.className = "dot connected";
             txt.innerText = "Connected to WhatsApp";
             qrBox.innerHTML = '<p style="color:var(--success)"><i class="fa-solid fa-check-circle" style="font-size:3rem"></i><br><br>Device is connected and ready.</p>';
+            if (data.outboxPaused) {
+                const notice = document.createElement('p');
+                notice.textContent = 'Pengiriman antrean sedang dijeda.';
+                qrBox.appendChild(notice);
+            }
         } else {
             ind.className = "dot disconnected";
             txt.innerText = "Disconnected";
-            if(data.qr) {
+            if(Number.isSafeInteger(data.qr) && data.qr > 0) {
+                if (qrBox.querySelector(`img[data-revision="${data.qr}"]`)) return;
                 qrBox.innerHTML = `
                     <div style="display:flex;flex-direction:column;align-items:center;">
-                        <div id="qrcode_canvas" style="background:white;padding:15px;border-radius:10px;"></div>
-                        <p style="margin-top:15px">Silakan scan QR Code ini dari Aplikasi WhatsApp Anda (Tautkan Perangkat)</p>
+                        <img src="/api/pairing-qr?v=${data.qr}" data-revision="${data.qr}" width="250" height="250" alt="QR untuk menautkan WhatsApp" style="background:white;border-radius:10px;">
+                        <p style="margin-top:15px">Pindai QR di WhatsApp → Perangkat tertaut.</p>
                     </div>`;
-                new QRCode(document.getElementById("qrcode_canvas"), {
-                    text: data.qr,
-                    width: 250,
-                    height: 250
-                });
+                qrBox.querySelector('img').addEventListener('error', (event) => event.currentTarget.remove());
             } else {
-                qrBox.innerHTML = '<p>Loading connection state...</p>';
+                qrBox.textContent = ({
+                    conflict: 'Sesi WhatsApp sedang dipakai koneksi lain. Hentikan instance duplikat, lalu mulai ulang sesi.',
+                    logged_out: 'WhatsApp tidak lagi tertaut. Gunakan menu Logout / Hapus Session, lalu pindai QR baru.',
+                    disabled: 'Mode pengujian database: WhatsApp tidak dihubungkan.',
+                    stopped: 'Sesi WhatsApp dihentikan.',
+                    connecting: 'Menghubungkan ke WhatsApp…'
+                })[data.whatsappState] || 'Menunggu status WhatsApp…';
             }
         }
     } catch(e) { }
@@ -482,15 +492,16 @@ async function loadConfig() {
     try {
         const res = await fetch('/api/config');
         const data = await res.json();
-        document.getElementById('cfg-db_type').value = data.db_type || 'mysql';
         document.getElementById('cfg-host').value = data.host || '';
-        document.getElementById('cfg-db').value = data.database || '';
+        document.getElementById('cfg-db-port').value = data.db_port ?? 3306;
         document.getElementById('cfg-user').value = data.user || '';
         document.getElementById('cfg-delay').value = data.delay || 10;
-        document.getElementById('cfg-webhook').value = data.webhook_url || '';
-        document.getElementById('cfg-botexe').value = data.bot_exe || '';
-        if(typeof updateDBHelp === 'function') updateDBHelp();
+        document.getElementById('cfg-db').value = data.database || '';
     } catch(e) {}
+}
+
+function escapeMessageField(value) {
+    return String(value).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[ch]);
 }
 
 async function loadInbox() {
@@ -504,7 +515,7 @@ async function loadInbox() {
             const no = r.wa_no || r.WA_NO || '-';
             const text = (r.wa_text || r.WA_TEXT || '').substring(0, 50) + '...';
             const time = r.wa_time || r.WA_TIME || '-';
-            tb.innerHTML += `<tr><td>${id}</td><td>${no}</td><td>${text}</td><td>${time}</td></tr>`;
+            tb.innerHTML += `<tr>${[id,no,text,time].map(value => `<td>${escapeMessageField(value)}</td>`).join('')}</tr>`;
         });
         if(data.length === 0) tb.innerHTML = '<tr><td colspan="4">Inbox is empty.</td></tr>';
     } catch(e){}
@@ -525,104 +536,14 @@ async function loadOutbox() {
             let text = rawText.substring(0, 40);
             if(rawText.length > 40 || r.wa_media || r.wa_file) text += '... (Click to view)';
             tb.innerHTML += `<tr style="cursor:pointer;" onclick="showMsgDetail(${idx}, 'outbox')">
-                <td>${id}</td>
-                <td>${time}</td>
-                <td>${no}</td>
-                <td><span style="color:#3498db">${text}</span></td>
+                <td>${escapeMessageField(id)}</td>
+                <td>${escapeMessageField(time)}</td>
+                <td>${escapeMessageField(no)}</td>
+                <td><span style="color:#3498db">${escapeMessageField(text)}</span></td>
             </tr>`;
         });
         if(data.length === 0) tb.innerHTML = '<tr><td colspan="4" data-t="msg_empty">Outbox is empty.</td></tr>';
     } catch(e){}
-}
-async function updateBaileys() {
-    const btn = document.getElementById('btn-update');
-    const oriText = btn.innerHTML;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Updating (Harap Tunggu)...`;
-    btn.disabled = true;
-
-    try {
-        const res = await fetch('/api/update-baileys', { method: 'POST' });
-        const data = await res.json();
-        if(data.success) {
-            alert("Pembaruan Selesai!\n\n" + data.message + "\n\nHarap klik tombol STOP.bat lalu START.bat kembali agar WAGW menelan versi baru.");
-        } else {
-            alert("Gagal melakukan Pembaruan: \n" + data.message);
-        }
-    } catch(e) {
-        alert("Koneksi gagal atau Proses terlalu lama.");
-    }
-
-    btn.innerHTML = oriText;
-    btn.disabled = false;
-}
-
-window._latestOTA = null;
-
-async function checkAppUpdate() {
-    const btn = document.getElementById('btn-ota-check');
-    const box = document.getElementById('ota-result-box');
-    const oriText = btn.innerHTML;
-    
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Checking Server...`;
-    btn.disabled = true;
-    box.style.display = 'none';
-
-    try {
-        const res = await fetch('/api/check-update');
-        const data = await res.json();
-        
-        box.style.display = 'block';
-        if(data.updateAvailable) {
-            window._latestOTA = data.files;
-            box.style.border = '1px solid var(--success)';
-            box.innerHTML = `
-                <div style="color:var(--success); margin-bottom:10px;"><strong><i class="fa-solid fa-bolt"></i> Update OTA Tersedia! (Ver ${data.latest})</strong></div>
-                <div>Versi saat ini: ${data.current}</div>
-                <div style="margin:5px 0; color:#ccc;"><em>"${data.changelog}"</em></div>
-                <button class="btn btn-success" style="width:100%; margin-top:10px;" onclick="applyAppUpdate()"><i class="fa-solid fa-download"></i> Terapkan Update (Auto Restart)</button>
-            `;
-        } else if (data.error) {
-            box.style.border = '1px solid var(--danger)';
-            box.innerHTML = `<span style="color:var(--danger)">Error: ${data.error}</span>`;
-        } else {
-            box.style.border = '1px solid #444';
-            box.innerHTML = `<span style="color:#aaa"><i class="fa-solid fa-check"></i> WAGW PRO Anda sudah versi paling mutakhir (Ver ${data.current}).</span>`;
-        }
-    } catch(e) {
-        box.style.display = 'block';
-        box.innerHTML = `<span style="color:var(--danger)">Koneksi ke Server wa-gw.com gagal.</span>`;
-    }
-
-    btn.innerHTML = oriText;
-    btn.disabled = false;
-}
-
-async function applyAppUpdate() {
-    if(!window._latestOTA) return;
-    if(!confirm("Proses ini akan menimpa file lokal dan merestart mesin bot WAGW secara otomatis. Lanjutkan?")) return;
-    
-    const box = document.getElementById('ota-result-box');
-    box.innerHTML = `<div style="text-align:center; padding:10px;"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><br><br>Mengunduh & menerapkan file pembaruan...<br>Jangan tutup layar ini.</div>`;
-    
-    try {
-        const res = await fetch('/api/apply-update', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({files: window._latestOTA})
-        });
-        const data = await res.json();
-        
-        if(data.success) {
-            box.innerHTML = `<div style="color:var(--success); text-align:center; padding:10px;"><i class="fa-solid fa-check-circle fa-2x"></i><br><br>${data.message}</div>`;
-            setTimeout(() => {
-                window.location.reload();
-            }, 4000);
-        } else {
-            box.innerHTML = `<div style="color:var(--danger)">Gagal Menerapkan Update: ${data.error}</div>`;
-        }
-    } catch(e) {
-        box.innerHTML = `<div style="color:var(--danger)">Proses Update Timeout/Error. Silakan restart program secara manual.</div>`;
-    }
 }
 async function loadSent() {
     try {
@@ -640,27 +561,15 @@ async function loadSent() {
             if(rawText.length > 40 || r.wa_media || r.wa_file) text += '... (Click to view)';
             const status = r.status || r.STATUS || 'unknown';
             tb.innerHTML += `<tr style="cursor:pointer;" onclick="showMsgDetail(${idx}, 'sent')">
-                <td>${id}</td>
-                <td>${time}</td>
-                <td>${no}</td>
-                <td><span style="color:#3498db">${text}</span></td>
-                <td>${status}</td>
+                <td>${escapeMessageField(id)}</td>
+                <td>${escapeMessageField(time)}</td>
+                <td>${escapeMessageField(no)}</td>
+                <td><span style="color:#3498db">${escapeMessageField(text)}</span></td>
+                <td>${escapeMessageField(status)}</td>
             </tr>`;
         });
         if(data.length === 0) tb.innerHTML = '<tr><td colspan="5" data-t="msg_empty">Sent box is empty.</td></tr>';
     } catch(e){}
-}
-
-async function clearOutbox() {
-    if(!confirm("Hapus semua antrean outbox?")) return;
-    await fetch('/api/clear-outbox', {method: 'POST'});
-    loadOutbox();
-}
-
-async function clearSent() {
-    if(!confirm("Hapus history sent?")) return;
-    await fetch('/api/clear-sent', {method: 'POST'});
-    loadSent();
 }
 
 async function logoutSession() {
@@ -681,9 +590,9 @@ function showMsgDetail(idx, type) {
     const media = dataRow.wa_media || dataRow.WA_MEDIA || '';
     const file = dataRow.wa_file || dataRow.WA_FILE || '';
     
-    let out = `<b>Pesan/Text:</b><br/>${text.replace(/\n/g, '<br/>')}`;
-    if(media) out += `<br/><br/><b>Media Attachment:</b><br/>${media}`;
-    if(file) out += `<br/><br/><b>File Attachment:</b><br/>${file}`;
+    let out = `<b>Pesan/Text:</b><br/>${escapeMessageField(text).replace(/\n/g, '<br/>')}`;
+    if(media) out += `<br/><br/><b>Media Attachment:</b><br/>${escapeMessageField(media)}`;
+    if(file) out += `<br/><br/><b>File Attachment:</b><br/>${escapeMessageField(file)}`;
     
     document.getElementById('msgModalBody').innerHTML = out;
     document.getElementById('msgModal').style.display = 'block';
@@ -695,11 +604,11 @@ const UI_DICT = {
         "th_time": "Time", "th_receiver": "Receiver", "th_text": "Text", "th_status": "Status",
         "btn_check": "Check Status", "btn_close": "Close", "modal_title": "Message Detail",
         "msg_empty": "Table is empty.", "btn_logout": "Logout WA (Clear Session)",
-        "nav_status": "Status", "nav_config": "Config", "nav_send": "Send Message", "nav_inbox": "Inbox", "nav_outbox": "Outbox", "nav_sent": "Sent", "nav_tools": "Tools",
-        "hs_status": "System Status", "p_status": "Monitor your WhatsApp connection state.",
+        "nav_status": "Status", "nav_config": "Config", "nav_send": "WhatsApp Test", "nav_inbox": "Inbox", "nav_outbox": "Outbox", "nav_sent": "Sent", "nav_tools": "Tools",
+        "hs_status": "JIBAS Status", "p_status": "Monitor the JIBAS outbox worker and WhatsApp connection.",
         "hs_config": "Configuration", "p_config": "Set up database connection and system parameters.",
-        "hs_send": "Send Message", "p_send": "Draft and send quick messages directly into the outbox.",
-        "hs_inbox": "Inbox Messages", "p_inbox": "Live monitor of incoming messages.",
+        "hs_send": "Direct WhatsApp Test", "p_send": "Use the JIBAS SMS menu for operational messages. This test does not validate the JIBAS queue.",
+        "hs_inbox": "Inbox History", "p_inbox": "Existing records only; JIBAS WG does not receive new inbox messages.",
         "hs_outbox": "Outbox Queue", "p_outbox": "Pending messages waiting to be sent.",
         "hs_sent": "Sent History", "p_sent": "Successfully processed messages.",
         "hs_tools": "Tools & Utilities", "p_tools": "Check WhatsApp number availability."
@@ -708,11 +617,11 @@ const UI_DICT = {
         "th_time": "Waktu", "th_receiver": "Penerima", "th_text": "Isi Pesan", "th_status": "Status",
         "btn_check": "Periksa Status", "btn_close": "Tutup", "modal_title": "Detail Baris Pesan",
         "msg_empty": "Tabel ini kosong.", "btn_logout": "Keluar WA (Hapus Sesi)",
-        "nav_status": "Status Sistem", "nav_config": "Pengaturan", "nav_send": "Kirim Pesan", "nav_inbox": "Kotak Masuk", "nav_outbox": "Kotak Keluar", "nav_sent": "Terkirim", "nav_tools": "Alat Lain",
-        "hs_status": "Status Server", "p_status": "Pantau koneksi WhatsApp Anda secara langsung.",
+        "nav_status": "Status JIBAS", "nav_config": "Pengaturan", "nav_send": "Uji WhatsApp", "nav_inbox": "Kotak Masuk", "nav_outbox": "Kotak Keluar", "nav_sent": "Terkirim", "nav_tools": "Alat Lain",
+        "hs_status": "Status JIBAS", "p_status": "Pantau worker antrean JIBAS dan koneksi WhatsApp.",
         "hs_config": "Pengaturan Sistem", "p_config": "Atur kredensial database dan parameter bot.",
-        "hs_send": "Kirim Cepat", "p_send": "Masukkan pesan ke antrean secara manual dari web.",
-        "hs_inbox": "Pesan Masuk", "p_inbox": "Riwayat chat WhatsApp yang diterima server.",
+        "hs_send": "Uji langsung WhatsApp", "p_send": "Gunakan menu SMS JIBAS untuk kiriman operasional; uji ini tidak memeriksa perpindahan antrean JIBAS.",
+        "hs_inbox": "Riwayat Pesan Masuk", "p_inbox": "Hanya riwayat lama; JIBAS WG tidak menerima pesan masuk baru.",
         "hs_outbox": "Antrean Keluar", "p_outbox": "Pesan tertahan yang dijadwalkan untuk dikirim.",
         "hs_sent": "Pesan Terkirim", "p_sent": "Riwayat pesan yang sukses diluncurkan.",
         "hs_tools": "Peralatan", "p_tools": "Lakukan cek apakah suatu nomor terdaftar di WA."
@@ -732,6 +641,19 @@ function setLang(lang) {
     }
 }
 
+function databaseForm() {
+    const payload = {
+        db_type: 'mysql',
+        host: document.getElementById('cfg-host').value,
+        database: document.getElementById('cfg-db').value,
+        db_port: document.getElementById('cfg-db-port').value,
+        user: document.getElementById('cfg-user').value
+    };
+    const pass = document.getElementById('cfg-pass').value;
+    if (pass) payload.password = pass;
+    return payload;
+}
+
 async function testDBConnection() {
     const btn = document.querySelector('button[onclick="testDBConnection()"]');
     const resDiv = document.getElementById('test-db-result');
@@ -744,14 +666,7 @@ async function testDBConnection() {
     resDiv.style.padding = '10px';
     resDiv.style.backgroundColor = 'rgba(0,0,0,0.5)';
     
-    const payload = {
-        db_type: document.getElementById('cfg-db_type').value,
-        host: document.getElementById('cfg-host').value,
-        database: document.getElementById('cfg-db').value,
-        user: document.getElementById('cfg-user').value
-    };
-    const pass = document.getElementById('cfg-pass').value;
-    if(pass) payload.password = pass;
+    const payload = databaseForm();
 
     try {
         const res = await fetch('/api/test-db', {
@@ -762,12 +677,12 @@ async function testDBConnection() {
         const data = await res.json();
         
         if (data.success) {
-            resDiv.innerHTML = data.message;
+            resDiv.textContent = data.message;
             resDiv.style.backgroundColor = 'rgba(46, 204, 113, 0.2)';
             resDiv.style.border = '1px solid #2ecc71';
             resDiv.style.color = '#2ecc71';
         } else {
-            resDiv.innerHTML = `<strong>Gagal:</strong> ${data.error}`;
+            resDiv.textContent = 'Gagal: ' + data.error;
             resDiv.style.backgroundColor = 'rgba(231, 76, 60, 0.2)';
             resDiv.style.border = '1px solid #e74c3c';
             resDiv.style.color = '#e74c3c';
@@ -779,27 +694,6 @@ async function testDBConnection() {
     
     btn.innerHTML = oldHtml;
     btn.disabled = false;
-}
-
-function updateDBHelp() {
-    const sel = document.getElementById('cfg-db_type').value;
-    const box = document.getElementById('db-help-box');
-    
-    if (sel === 'sqlite') {
-        box.style.display = 'block';
-        box.innerHTML = `<i class="fa-solid fa-circle-info"></i> <b>SQLite:</b> Sangat mudah. Biarkan field Host, Database, User, dan Password <b>kosong</b> atau abaikan nilainya. Sistem otomatis membuat 'wg.sqlite' di dalam folder.`;
-    } else if (sel === 'odbc') {
-        box.style.display = 'block';
-        box.innerHTML = `<i class="fa-solid fa-circle-info"></i> <b>ODBC / DSN:</b> Masukkan koneksi string utuh Anda (Contoh: <code>DSN=my_dsn;</code>) HANYA pada field <b>Database Host</b>. Field Name, User, dan Password <b>boleh dikosongkan</b>.`;
-    } else if (sel === 'oracle') {
-        box.style.display = 'block';
-        box.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> <b>Oracle:</b> Gunakan format koneksi <code>host:port</code> (Tanpa SID). Jika menabrak error "NJS-138 (Thin mode)", itu berarti versi lawas seperti 11g butuh akses Thick mode. Akan jauh lebih mudah jika Anda membungkus Oracle via ODBC DSN Windows.`;
-    } else if (sel === 'mysql' || sel === 'sqlserver') {
-        box.style.display = 'block';
-        box.innerHTML = `<i class="fa-solid fa-circle-info"></i> <b>${sel.toUpperCase()}:</b> Harap lengkapi semua kolom Host, Database Name, Username, dan Password (Hanya kosongkan Password jika memang tidak dipassword).`;
-    } else {
-        box.style.display = 'none';
-    }
 }
 
 async function controlWA(action) {

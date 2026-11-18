@@ -1,13 +1,11 @@
 {
     "db_type": "mysql",
     "host": "127.0.0.1",
-    "database": "wagw",
-    "user": "wagw_app",
+    "database": "jibas_wg",
+    "user": "jibas_wg_app",
     "password": "",
     "delay": 10,
     "port": 3000,
-    "webhook_url": "",
-    "bot_exe": "",
-    "db_port": 3434,
+    "db_port": 3306,
     "timezone": "+07:00"
 }

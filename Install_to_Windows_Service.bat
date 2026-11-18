@@ -1,10 +1,5 @@
 @echo off
-title Install WAGW PRO Service
-echo ===================================================
-echo Menginstal WAGW PRO sebagai Windows Service...
-echo Akan muncul jendela prompt dari Windows "User Account Control (UAC)".
-echo Silakan klik "Yes" untuk mengizinkan bot berjalan di latar belakang.
-echo ===================================================
-cd /d "%~dp0"
-node Install_Service.js
-pause
+rem JIBAS WhatsApp Gateway installer
+setlocal DisableDelayedExpansion
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0deployment\windows\install.ps1" %*
+exit /b %errorlevel%

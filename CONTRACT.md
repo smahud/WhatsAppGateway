@@ -1,25 +1,25 @@
-# Kontrak Implementasi Integrasi JIBAS–WAGW
+# Kontrak Integrasi JIBAS WhatsApp Gateway
 
 Dokumen ini menetapkan perilaku teknis integrasi yang disepakati pada proyek ini. Ini bukan kontrak hukum atau pemberian lisensi atas source asli.
 
-Status dokumentasi: 15 November 2026. Target fitur tetap satu akun WhatsApp dan outbox teks MOVE; klaim di luar lingkup tersebut memerlukan implementasi dan pengujian tersendiri.
+Target fitur adalah satu akun WhatsApp dan outbox teks MOVE; fitur di luar lingkup ini memerlukan implementasi dan pengujian tersendiri.
 
 ## Ruang lingkup
 
-1. Fitur aktif adalah **pemindahan outbox JIBAS ke WAGW**.
-2. Source JIBAS dipertahankan. Perubahan integrasi ditempatkan dalam `deployment/`, konfigurasi lokal, dan objek database tambahan. Perubahan WAGW dibatasi pada pemuatan driver sesuai kebutuhan, satu scheduler outbox saat reconnect, dan penggunaan ulang DB sehat pada reconnect. Pengaman deployment ditempatkan pada launcher; tidak menambah fitur inbox atau multi-account.
+1. Fitur aktif dan default proyek adalah **pengganti pengiriman SMS keluar JIBAS melalui WhatsApp**, menggunakan MOVE outbox.
+2. Source JIBAS dipertahankan. Integrasi berada di `deployment/`, konfigurasi lokal, dan objek database tambahan. Setiap launcher normal membutuhkan schema dan trigger JIBAS. Tidak ada mode instalasi tanpa JIBAS, sinkronisasi inbox JIBAS, atau dukungan multi-account.
 3. Sinkronisasi inbox, penghapusan inbox dua arah, dan penambahan komunikasi eksternal di luar pesan antrean bukan bagian dari implementasi outbox ini.
-4. Instalasi ini menggunakan `wagw` dan `jbssms` pada instance MySQL/MariaDB yang sama. Kredensial tidak ditulis dalam dokumentasi atau Git.
+4. Database gateway (`jibas_wg` untuk pemasangan baru, `wagw` sebagai schema kompatibilitas) dan `jbssms` berada pada satu instance MySQL/MariaDB. Kredensial tidak ditulis dalam dokumentasi atau Git.
 
 ## Kontrak pemindahan
 
 | Aspek | Perilaku |
 | --- | --- |
 | Sumber | INSERT baru ke `jbssms.outbox` setelah trigger capture terpasang |
-| Capture | Trigger mencatat ID sumber, nomor, teks, multipart, dan jadwal ke `wagw.bridge_outgoing` |
+| Capture | Trigger mencatat ID sumber, nomor, teks, multipart, dan jadwal ke `bridge_outgoing` pada schema gateway |
 | Jadwal | Sumber tetap di JIBAS sampai waktunya tiba; `NULL`/zero date dianggap tanpa penundaan |
 | Data saat transfer | Worker membaca dan mengunci sumber terbaru, kemudian mengunci job |
-| Transaksi | INSERT `wagw.outbox`, UPDATE referensi job, DELETE sumber JIBAS, lalu COMMIT |
+| Transaksi | INSERT `outbox` gateway, UPDATE referensi job, DELETE sumber JIBAS, lalu COMMIT |
 | Kegagalan transaksi | ROLLBACK semua langkah; sumber tetap ada dan tidak terbentuk tujuan baru yang committed |
 | Riwayat | `jbssms.outboxhistory` tidak dihapus atau dipalsukan statusnya |
 | Sumber hilang | Job `cancelled`, tanpa mengirim salinan capture yang sudah kedaluwarsa |
@@ -27,7 +27,7 @@ Status dokumentasi: 15 November 2026. Target fitur tetap satu akun WhatsApp dan 
 | Koreksi sumber | UPDATE pada sumber pending/rejected memperbarui capture dan mengembalikannya ke pending |
 | Kirim ulang JIBAS | ID sumber baru diperlakukan sebagai pesan baru yang memang diminta |
 
-Move selesai ketika pesan sudah berada pada antrean WAGW, bukan ketika diterima HP. Jadwal dipenuhi sebagai waktu paling awal transfer, bukan jaminan waktu kirim tepat; polling bridge dan scheduler gateway menambah jeda.
+MOVE selesai ketika pesan berada pada antrean gateway, bukan ketika diterima HP. Jadwal menentukan waktu paling awal transfer, bukan jaminan waktu kirim tepat; polling worker dan gateway menambah jeda.
 
 ## Validasi
 
@@ -42,9 +42,9 @@ Move selesai ketika pesan sudah berada pada antrean WAGW, bukan ketika diterima 
 | Status bridge | Makna |
 | --- | --- |
 | `pending` | Menunggu jadwal/pemrosesan; sumber belum dipindahkan |
-| `queued` | Move committed; sumber dihapus dan ID antrean WAGW tercatat |
-| `sent` | WAGW mencatat hasil pengiriman library sebagai sent |
-| `failed` | WAGW mencatat hasil selain sent |
+| `queued` | MOVE committed; sumber dihapus dan ID antrean gateway tercatat |
+| `sent` | Gateway mencatat hasil pengiriman library sebagai sent |
+| `failed` | Gateway mencatat hasil selain sent |
 | `rejected` | Validasi gagal; sumber tetap tersedia |
 | `cancelled` | Sumber tidak ditemukan saat diambil; tidak dikirim |
 
@@ -53,23 +53,23 @@ Tidak ada retry jaringan otomatis maupun penerjemahan `sent` menjadi delivery re
 ## Integritas dan konkurensi
 
 - Ketiga tabel perpindahan harus InnoDB; worker menolak engine lain.
-- Hanya satu worker bridge memegang named lock `wagw-jibas-bridge` pada instance database tersebut.
-- Transaksi dan referensi ID mencegah enqueue berulang untuk satu job oleh worker. Ini **bukan** jaminan exactly-once pengiriman jaringan pada gateway asli.
+- Hanya satu worker bridge yang memegang named lock pada instance database tersebut. Nama lock lama dipertahankan untuk mencegah dua versi berjalan bersama.
+- Transaksi dan referensi ID mencegah enqueue berulang. Selama proses masih hidup, kegagalan menulis hasil tidak memanggil WhatsApp lagi. Ini **bukan** jaminan exactly-once jika proses berhenti antara pengiriman dan pencatatan.
 - Consumer SMS lama tidak boleh mengambil antrean sumber yang sama. Row lock tidak dapat membatalkan SMS yang sudah dikirim consumer lain di luar transaksi.
 - ID sumber dan tujuan harus tetap stabil; jangan TRUNCATE/reset ID atau memanipulasi tabel audit ketika integrasi aktif.
 - Penghapusan riwayat tidak menjadi perintah pembatalan pesan. Perubahan setelah queued tidak disinkronkan ke tujuan.
-- Trigger menambah ketergantungan penulisan JIBAS terhadap schema WAGW. Melepas integrasi harus mendahului penghapusan tabel tujuan.
+- Trigger menambah ketergantungan penulisan JIBAS terhadap schema gateway. Lepas integrasi sebelum menghapus tabel tujuan. Installer memeriksa konflik antara trigger baru dan trigger legacy; hanya satu pasangan boleh aktif.
 
 ## Deployment dan data sensitif
 
-Installer Linux otomatis mendukung `install.sh --port 3000 --user admin --pass somepassword`. Parameter port adalah port publik HTTPS, user/pass adalah autentikasi dashboard pada Nginx, bukan akun database. Backend WAGW tetap di localhost. Akses publik memerlukan login dan TLS; sertifikat awal self-signed harus diverifikasi fingerprint-nya. Kredensial dashboard disimpan sebagai hash bcrypt di `/etc/wagw`, tidak dalam source/config WAGW. Opsi `--pass-file` menghindari password pada argumen/history.
+Installer membaca koneksi dan port dashboard dari `config.json`, disiapkan dari contoh. `--user` dan `--pass`/`--pass-file` mengatur login dashboard, bukan akun database. Batas akses: Windows lokal, Linux HTTPS melalui Nginx, backend tetap loopback. Pengguna membuka `/login` sebelum dashboard. Kredensial baru di-hash scrypt; bcrypt Linux lama dapat dimigrasikan tanpa mengetahui password aslinya. Instalasi pertama tanpa argumen membuat admin dengan password acak; repair tanpa argumen tidak me-rotate login.
 
-Mode MOVE diaktifkan default oleh installer baru; menjalankan perintah instalasi berarti menginstruksikan aktivasi. Consumer SMS lama harus sudah dihentikan. `--no-activate-move` memasang dalam keadaan paused untuk staging. Reinstall mempertahankan kredensial DB dan sesi; perubahan username memerlukan password yang diberikan eksplisit. Installer tidak menghentikan layanan aktif secara otomatis atau membuat database JIBAS.
+`deploy.js` dan installer memasang integrasi JIBAS dan mengaktifkan MOVE secara default. Consumer SMS lama harus sudah dihentikan. Aktivasi menolak pesan lama yang tidak dicatat trigger, tanpa replay atau penghapusan. `--no-activate-move` memasang integrasi dengan MOVE dijeda. `pause.js` tidak membatalkan pesan yang sudah masuk antrean gateway. Installer memeriksa port sebelum bootstrap: listener asing ditolak; hanya instance terverifikasi yang diperbaiki. `--credentials-only` tidak mengubah DB atau menghentikan layanan. Uninstall tidak menghapus DB JIBAS, trigger, config, login, sesi, atau antrean.
 
 - Bootstrap tidak mengimpor ulang schema asli ke database yang sudah memiliki tabel; instalasi baru mengekstrak CREATE TABLE tanpa menjalankan DROP. Migrasi `sent.status` hanya memperlebar VARCHAR kurang dari 20 karakter agar nilai failed dapat disimpan. SQL dump asli tetap mengandung DROP TABLE dan tidak boleh dieksekusi manual pada data aktif.
 - Runtime, dependency, konfigurasi, sesi, dan data produksi tidak dipublikasikan lewat Git.
 - Startup memerlukan hak Administrator dan verifikasi reboot; keberadaan skrip installer bukan bukti startup sudah terpasang.
-- Task Scheduler tidak menyimpan password database sebagai argumen; gateway/bridge membacanya dari konfigurasi lokal.
+- Windows Service menggunakan akun LocalService, tidak menyimpan password database sebagai argumen, dan mewajibkan login dashboard melalui hash scrypt lokal. Startup Scheduler lama tidak dijalankan bersamaan.
 - Sesi WhatsApp valid digunakan kembali; QR diperlukan jika belum tertaut atau sesi tidak berlaku.
 - Jangan mengirim pesan nyata untuk pengujian tanpa tujuan yang diizinkan. Pengujian regresi menggunakan rollback/tabel sementara.
 
@@ -81,20 +81,20 @@ Mode MOVE diaktifkan default oleh installer baru; menjalankan perintah instalasi
 4. Pesan terjadwal tetap berada di sumber sebelum waktunya.
 5. Sumber tidak valid tetap tersedia dengan alasan penolakan.
 6. Sumber yang sudah hilang tidak menghasilkan pengiriman dari snapshot.
-7. Status WAGW dapat direkonsiliasi ke job tanpa memalsukan status SMS JIBAS.
-8. Inbox tetap nonaktif dan source JIBAS tidak diubah. Perubahan WAGW terbatas pada pemuatan driver dan pengaman reconnect/scheduler yang dijelaskan di atas.
+7. Status gateway dapat direkonsiliasi ke job tanpa memalsukan status SMS JIBAS.
+8. Sinkronisasi inbox JIBAS tetap nonaktif dan source JIBAS tidak diubah.
 
-Pengaman VPS: launcher menolak startup sebelum DB/schema siap, mengambil named lock gateway, membatasi backend dashboard ke loopback, dan keluar ketika guard koneksi database hilang. Nginx menyediakan endpoint IP:PORT dengan HTTPS/login; systemd/Windows supervisor memulihkan proses. Proteksi singleton ini hanya berlaku untuk instance yang menggunakan launcher; menjalankan wabot.js langsung melewatinya.
+Launcher `deployment/start-gateway.js` menolak startup sebelum schema/trigger JIBAS siap, mengambil named lock gateway, membatasi backend ke loopback, dan keluar ketika koneksi penjaga lock hilang. Windows menjalankan worker di proses gateway yang sama; di Linux worker adalah unit systemd bagian dari gateway. Readiness mengharuskan worker tersedia kecuali mode diagnostik yang eksplisit. Penghapusan massal Outbox/Sent via dashboard dinonaktifkan agar tidak memutus audit JIBAS.
 
 Penerimaan produksi tetap memerlukan pengujian pada OS/VPS tujuan, startup ulang/reboot, cutover consumer lama, pairing, dan penerimaan pesan ke nomor tester yang disetujui. Laporan audit Windows tidak menggantikan pengujian Linux.
 
-Pemuatan driver: MySQL hanya memuat mysql2, Oracle hanya oracledb, SQL Server hanya mssql, SQLite memuat sqlite/sqlite3, ODBC hanya odbc. Tes koneksi menggunakan driver yang dipilih pada request tanpa mengganti pilihan database aktif. Driver yang pernah dimuat tetap berada di cache sampai restart. `deployment/test-db-loading.js` memverifikasi seluruh jalur memakai mock, termasuk kondisi driver lain tidak tersedia.
+Profil JIBAS hanya memakai MySQL/MariaDB. Tes koneksi dashboard memvalidasi schema JIBAS pada target tanpa mengganti database aktif. Perubahan koneksi baru dipakai setelah restart.
 
 Kriteria transaksi di atas telah diuji melalui `deployment/test-bridge.js`. Mode move diuji tanpa kiriman eksternal baru. Uji WhatsApp langsung pada tahap sebelumnya membuktikan jalur gateway, tetapi tidak menggantikan uji reboot atau validasi seluruh fitur JIBAS.
 
 ## Penghentian dan rollback
 
-Jeda bridge dengan `enabled=0`; pesan yang sudah di WAGW tetap dapat dikirim. Periksa antrean, hentikan supervisor, dan lepaskan trigger `jbssms.wagw_capture_outbox` serta `jbssms.wagw_update_outbox` sebelum menghapus schema integrasi. Pertahankan audit serta riwayat asli. Pengembalian pesan yang sudah dipindahkan membutuhkan rekonsiliasi manual berdasarkan ID/status agar tidak mengirim ulang pesan yang sudah terkirim.
+Jeda bridge dengan `deployment/pause.js`; pesan yang sudah di antrean gateway tetap dapat dikirim. Periksa antrean, hentikan layanan, dan lepaskan `jbssms.jibas_wg_capture_outbox` serta `jbssms.jibas_wg_update_outbox` sebelum menghapus schema integrasi. Untuk schema legacy `wagw`, nama kedua trigger diawali `wagw_`. Pertahankan audit serta riwayat asli. Pengembalian pesan yang sudah dipindahkan membutuhkan rekonsiliasi manual berdasarkan ID/status agar tidak mengirim ulang pesan yang sudah terkirim.
 
 ## Kontrak publikasi Git
 

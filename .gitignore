@@ -1,6 +1,8 @@
 # Local credentials and authentication
 /config.json
+/dashboard-auth.json
 **/github.pat.json
+**/github.pat.txt
 /.env
 /.env.*
 !/config.example.json
@@ -8,6 +10,7 @@
 
 # Dependencies and portable executables
 /node_modules/
+/.runtime/
 /.npm-audit-cache/
 /dist/
 /node.exe
@@ -28,6 +31,9 @@
 /.npm/
 *.key
 *.htpasswd
+*.pass
+*.pem
+*.pfx
 /deployment/last-test.json
 
 # Editor / OS files

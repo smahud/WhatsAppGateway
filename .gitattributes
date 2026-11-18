@@ -6,3 +6,5 @@
 *.sql text eol=lf
 *.ps1 text eol=crlf
 *.bat text eol=crlf
+*.py text eol=lf
+*.yml text eol=lf

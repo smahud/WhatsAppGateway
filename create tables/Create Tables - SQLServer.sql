@@ -59,8 +59,6 @@ CREATE TABLE multi (
   PRIMARY KEY ([id])
 )  ;
 
- 
-
 DROP TABLE IF EXISTS [outbox];
 
 CREATE TABLE outbox (
@@ -73,8 +71,6 @@ CREATE TABLE outbox (
   [wa_time] datetime2(0) NOT NULL DEFAULT GETDATE(),
   PRIMARY KEY ([id])
 )  ;
-
- 
 
 DROP TABLE IF EXISTS [sent];
 
@@ -90,16 +86,12 @@ CREATE TABLE sent (
   PRIMARY KEY ([id],[wa_time])
 )  ;
 
- 
-
 DROP TABLE IF EXISTS [tesbot];
 
 CREATE TABLE tesbot (
   [kode] varchar(10) DEFAULT NULL,
   [nama] varchar(50) DEFAULT NULL
 ) ;
-
- 
 
 DROP TABLE IF EXISTS [tmp];
 
@@ -108,8 +100,6 @@ CREATE TABLE tmp (
   [tmp_val] varchar(50) DEFAULT NULL,
   PRIMARY KEY ([tmp_cd])
 )  ;
-
- 
 
 DROP TABLE IF EXISTS [web_user];
 

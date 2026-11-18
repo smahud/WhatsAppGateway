@@ -1,6 +1,6 @@
 -- Read-only mapping: creating this view does not forward or send messages.
--- Original JIBAS tables are unchanged. Apply in the new wagw database only.
-CREATE OR REPLACE VIEW wagw.jibas_outbox_mapping AS
+-- Original JIBAS tables are unchanged. Select the configured gateway schema first.
+CREATE OR REPLACE VIEW jibas_outbox_mapping AS
 SELECT ID AS jibas_outbox_id,
        CASE
          WHEN LEFT(clean_number, 1) = '0' THEN CONCAT('62', SUBSTRING(clean_number, 2))

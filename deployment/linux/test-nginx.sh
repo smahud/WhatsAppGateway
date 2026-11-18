@@ -1,27 +1,30 @@
 #!/usr/bin/env bash
-# Ephemeral CI test only. Refuses any machine with an existing WAGW state folder.
+# Ephemeral CI test only. Requires nginx, apache2-utils, openssl and installed Node deps.
 set -euo pipefail
 [[ $EUID -eq 0 ]] || { echo 'Run as root on a disposable Linux CI runner'; exit 1; }
-[[ ! -e /etc/wagw && ! -L /etc/wagw ]] || { echo 'Refusing to touch existing /etc/wagw'; exit 1; }
+[[ ! -e /etc/jibas-wg && ! -L /etc/jibas-wg ]] || { echo 'Refusing to touch existing /etc/jibas-wg'; exit 1; }
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-WORK="$(mktemp -d /tmp/wagw-nginx-test.XXXXXX)"
+WORK="$(mktemp -d /tmp/jibas-wg-nginx-test.XXXXXX)"
 BACKEND_PID=''
 cleanup(){
  if [[ -f $WORK/nginx.pid ]]; then nginx -c "$WORK/nginx.conf" -p "$WORK/" -s quit || true; fi
  if [[ -n $BACKEND_PID ]]; then kill "$BACKEND_PID" 2>/dev/null || true; fi
- if [[ -f /etc/wagw/.ci-fixture && $(</etc/wagw/.ci-fixture) == "$WORK" ]]; then
-  rm -f /etc/wagw/dashboard.crt /etc/wagw/dashboard.key /etc/wagw/dashboard.htpasswd /etc/wagw/.ci-fixture
-  rmdir /etc/wagw
+ if [[ -f /etc/jibas-wg/.ci-fixture && $(</etc/jibas-wg/.ci-fixture) == "$WORK" ]]; then
+  rm -f /etc/jibas-wg/dashboard.crt /etc/jibas-wg/dashboard.key /etc/jibas-wg/.ci-fixture
+  rmdir /etc/jibas-wg
  fi
- case "$WORK" in /tmp/wagw-nginx-test.*) rm -rf -- "$WORK" ;; esac
+ case "$WORK" in /tmp/jibas-wg-nginx-test.*) rm -rf -- "$WORK" ;; esac
 }
 trap cleanup EXIT
-install -d -m 750 -o root -g www-data /etc/wagw
-printf '%s\n' "$WORK" > /etc/wagw/.ci-fixture
-openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=127.0.0.1' -keyout /etc/wagw/dashboard.key -out /etc/wagw/dashboard.crt 2>/dev/null
-printf '%s\n' ci-fixture-password | htpasswd -i -B -c /etc/wagw/dashboard.htpasswd admin >/dev/null
-chown root:www-data /etc/wagw/dashboard.htpasswd; chmod 640 /etc/wagw/dashboard.htpasswd
-WG_PORT_FILE="$WORK/backend-port" node -e 'const fs=require("fs"),s=require("http").createServer((q,r)=>{r.end("fixture-ok")});s.listen(0,"127.0.0.1",()=>fs.writeFileSync(process.env.WG_PORT_FILE,String(s.address().port)))' &
+install -d -m 750 -o root -g www-data /etc/jibas-wg
+printf '%s\n' "$WORK" > /etc/jibas-wg/.ci-fixture
+openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=127.0.0.1' -keyout /etc/jibas-wg/dashboard.key -out /etc/jibas-wg/dashboard.crt 2>/dev/null
+printf '%s\n' ci-fixture-password | htpasswd -i -B -c "$WORK/old.htpasswd" admin >/dev/null
+JIBAS_WG_AUTH_FILE="$WORK/dashboard-auth.json" JIBAS_WG_LEGACY_HTPASSWD="$WORK/old.htpasswd" node "$ROOT/deployment/dashboard-credentials.js"
+(
+ cd "$ROOT"
+ JIBAS_WG_TEST_WORK="$WORK" node -e 'const {dashboardAuth}=require("./deployment/dashboard-auth"),fs=require("node:fs"),express=require("express"),app=express(),dir=process.env.JIBAS_WG_TEST_WORK;app.use(dashboardAuth({file:dir+"/dashboard-auth.json",https:true}));app.all("/{*path}",(req,res)=>res.send("fixture-ok"));const s=app.listen(0,"127.0.0.1",()=>fs.writeFileSync(dir+"/backend-port",String(s.address().port)))'
+) &
 BACKEND_PID=$!
 for ((i=0;i<50;i++)); do [[ -f $WORK/backend-port ]] && break; sleep 0.1; done
 BACKEND=$(<"$WORK/backend-port")
@@ -31,11 +34,19 @@ printf 'user www-data;\npid %s/nginx.pid;\nerror_log %s/error.log;\nevents {}\nh
 nginx -t -c "$WORK/nginx.conf" -p "$WORK/"
 nginx -c "$WORK/nginx.conf" -p "$WORK/"
 URL="https://127.0.0.1:$PORT"
-[[ $(curl -ksS -o /dev/null -w '%{http_code}' "$URL/") == 401 ]]
-[[ $(curl -ksS -u admin:wrong -o /dev/null -w '%{http_code}' "$URL/") == 401 ]]
-[[ $(curl -ksS -u admin:ci-fixture-password "$URL/") == fixture-ok ]]
-[[ $(curl -ksS -u admin:ci-fixture-password -H 'Origin: https://untrusted.invalid' -X POST -o /dev/null -w '%{http_code}' "$URL/api/config") == 403 ]]
-[[ $(curl -ksS -u admin:ci-fixture-password -H "Origin: $URL" -X POST "$URL/api/config") == fixture-ok ]]
-[[ $(curl -ksS -u admin:ci-fixture-password -o /dev/null -w '%{http_code}' "$URL/api/apply-update") == 403 ]]
+status() { curl -ksS -o /dev/null -w '%{http_code}' "$@"; }
+[[ $(curl -ksS -o /dev/null -w '%{redirect_url}' "$URL/") == "$URL/login" ]]
+[[ $(curl -ksS "$URL/login") == *'Masuk ke JIBAS WhatsApp Gateway'* ]]
+[[ $(status "$URL/api/status") == 401 ]]
+[[ $(status -d 'username=admin&password=wrong' "$URL/login") == 401 ]]
+[[ $(status -d 'username=admin&password=ci-fixture-password' -H "Origin: $URL" -c "$WORK/cookies" "$URL/login") == 303 ]]
+[[ $(curl -ksS -b "$WORK/cookies" "$URL/") == fixture-ok ]]
+[[ $(status -b "$WORK/cookies" -H 'Origin: https://untrusted.invalid' -X POST "$URL/api/config") == 403 ]]
+[[ $(status -b "$WORK/cookies" "$URL/api/apply-update") == 403 ]]
+[[ $(status "$URL/healthz") == 404 ]]
 [[ $(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/") == 301 ]]
-echo 'PASS: real Nginx HTTPS, login, wrong password, authenticated proxy, CSRF rejection and HTTP redirect.'
+JIBAS_WG_AUTH_FILE="$WORK/dashboard-auth.json" JIBAS_WG_LOGIN_USER=operator JIBAS_WG_LOGIN_PASSWORD=ci-rotated-password node "$ROOT/deployment/dashboard-credentials.js"
+[[ $(status -b "$WORK/cookies" "$URL/") == 303 ]]
+[[ $(status -d 'username=operator&password=ci-rotated-password' -c "$WORK/cookies" "$URL/login") == 303 ]]
+[[ $(curl -ksS -b "$WORK/cookies" "$URL/") == fixture-ok ]]
+echo 'PASS: Nginx HTTPS login page, cookie auth, migrated bcrypt, live credential rotation and cross-origin rejection.'

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Masuk — JIBAS WhatsApp Gateway</title>
+    <style>
+        *{box-sizing:border-box}
+        body{margin:0;min-height:100vh;display:grid;place-items:center;padding:1rem;background:#0c1424;color:#eef4fb;font:16px system-ui,sans-serif}
+        main{width:min(100%,25rem);background:#152239;border:1px solid #33445f;border-radius:1rem;padding:2rem}
+        h1{margin:.25rem 0;font-size:1.6rem}
+        p{color:#b9c8dc}
+        label{display:block;margin:1rem 0 .4rem}
+        input,button{width:100%;font:inherit;border-radius:.5rem;padding:.7rem}
+        input{border:1px solid #657997;color:inherit;background:#0c1728}
+        input:focus-visible,button:focus-visible{outline:3px solid #8feaff;outline-offset:2px}
+        button{margin-top:1.4rem;background:#86ebce;color:#0c2825;font-weight:700;border:0;cursor:pointer}
+        [role=alert]{color:#ffd2b8}
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Masuk ke JIBAS WhatsApp Gateway</h1>
+        <p>Dashboard pengiriman SMS JIBAS melalui WhatsApp.</p>
+        <!-- error -->
+        <form method="post" action="/login">
+            <label for="username">Username dashboard</label>
+            <input id="username" name="username" autocomplete="username" maxlength="64" required autofocus>
+            <label for="password">Password dashboard</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" maxlength="256" required>
+            <button type="submit">Masuk</button>
+        </form>
+    </main>
+</body>
+</html>

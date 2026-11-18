@@ -1,4 +1,4 @@
-name: Linux installer checks
+name: JIBAS WG Linux installer checks
 on:
   push:
     branches: [main]
@@ -9,36 +9,52 @@ permissions:
 jobs:
   installer:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: isolated-ci-only-db
+        ports:
+          - 127.0.0.1:33316:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - name: Install text/MySQL dependencies
-        run: npm ci --omit=dev --omit=optional --no-audit --no-fund
-      - name: Offline application tests
+      - name: Clean dependencies and unit tests
         run: |
-          cp config.example.json config.json
-          node deployment/test-db-loading.js
-          node deployment/test-deployment.js
-          node deployment/test-linux-install.js
+          npm ci --omit=dev --omit=optional --no-audit --no-fund
+          npm test
       - name: Install Linux validation tools
         run: |
           sudo apt-get update
           sudo apt-get install -y nginx apache2-utils openssl shellcheck
       - name: Validate Bash and CLI error handling
         run: |
-          bash -n install.sh deployment/linux/install.sh deployment/linux/test-nginx.sh
-          shellcheck --severity=error install.sh deployment/linux/install.sh deployment/linux/test-nginx.sh
+          for script in install.sh uninstall.sh deployment/linux/*.sh; do bash -n "$script"; done
+          shellcheck --severity=error install.sh uninstall.sh deployment/linux/*.sh
           bash install.sh --help
+          bash uninstall.sh --help
+          cp config.example.json config.json
           if sudo bash install.sh --port 0; then exit 1; fi
           if sudo bash install.sh --port 70000; then exit 1; fi
           if sudo bash install.sh --user 'invalid:user'; then exit 1; fi
           if sudo bash install.sh --pass; then exit 1; fi
-      - name: Validate actual HTTPS and dashboard authentication
+          rm config.json
+          bash deployment/linux/test-ports.sh
+      - name: Validate HTTPS and credential migration
         run: sudo env PATH="$PATH" bash deployment/linux/test-nginx.sh
+      - name: Exercise full installer and JIBAS flow on systemd
+        run: |
+          sudo env PATH="$PATH" GITHUB_ACTIONS=true JIBAS_WG_CI_DB_PASSWORD=isolated-ci-only-db \
+            bash deployment/linux/test-systemd.sh
       - name: Publish Linux check result
         if: always()
         env:
@@ -54,10 +70,9 @@ jobs:
             const response=await fetch(`https://api.github.com/repos/${process.env.GH_REPOSITORY}/statuses/${process.env.GH_SHA}`,{
               method:'POST',
               headers:{Authorization:`Bearer ${process.env.GH_TOKEN}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},
-              body:JSON.stringify({state,context:'linux-installer/validation',description:'Bash, Node and HTTPS/login smoke checks',target_url:process.env.GH_RUN_URL})
+              body:JSON.stringify({state,context:'linux-installer/validation',description:'JIBAS WG Linux validation',target_url:process.env.GH_RUN_URL})
             });
             if(!response.ok)throw Error(`Could not publish status: HTTP ${response.status}`);
             console.log('Linux check result:',state);
           })().catch(e=>{console.error(e.message);process.exitCode=1;});
           NODE
-

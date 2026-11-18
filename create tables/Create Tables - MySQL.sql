@@ -1,6 +1,8 @@
 /*
 SQLyog Community v12.5.0 (32 bit)
-MySQL - 10.1.32-MariaDB : Database - wagw
+MySQL / MariaDB : Database - jibas_wg
+JIBAS WhatsApp Gateway uses the CREATE TABLE statements only. Do not import
+this dump on a live database: the DROP TABLE statements below are destructive.
 *********************************************************************
 */
 
@@ -12,9 +14,9 @@ MySQL - 10.1.32-MariaDB : Database - wagw
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-CREATE DATABASE /*!32312 IF NOT EXISTS*/`wagw` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */;
+CREATE DATABASE /*!32312 IF NOT EXISTS*/`jibas_wg` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */;
 
-USE `wagw`;
+USE `jibas_wg`;
 
 /*Table structure for table `autorespon` */
 
@@ -155,7 +157,7 @@ CREATE TABLE `web_user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
-ALTER DATABASE wagw CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+ALTER DATABASE jibas_wg CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 ALTER TABLE outbox CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ALTER TABLE multi CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
