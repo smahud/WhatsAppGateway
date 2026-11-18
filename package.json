@@ -21,7 +21,7 @@
     "activate": "node deployment/activate.js",
     "pause": "node deployment/pause.js",
     "test:jibas": "node deployment/test-bridge.js",
-    "test": "node deployment/test-db-loading.js && node deployment/test-deployment.js && node deployment/test-dashboard-auth.js && node deployment/test-linux-install.js"
+    "test": "node deployment/test-db-loading.js && node deployment/test-deployment.js && node deployment/test-dashboard-auth.js && node deployment/test-dashboard-ui.js && node deployment/test-linux-install.js"
   },
   "optionalDependencies": {
     "mssql": "^12.3.0",

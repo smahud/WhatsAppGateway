@@ -26,6 +26,9 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Initial Load
     loadPageData('status-page');
+    setInterval(() => {
+        if (!document.hidden && document.getElementById('status-page').classList.contains('active')) loadStatus();
+    }, 3000);
     
     // Send Form
     document.getElementById('send-form').addEventListener('submit', async (e) => {
@@ -417,9 +420,12 @@ function loadPageData(pageId) {
     else if(pageId === 'sent-page') loadSent();
 }
 
+let refreshingStatus = false;
 async function loadStatus() {
+    if (refreshingStatus) return;
+    refreshingStatus = true;
     try {
-        const res = await fetch('/api/status');
+        const res = await fetch('/api/status', {signal: AbortSignal.timeout(5000)});
         if (res.status === 401) {
             window.location.replace('/login');
             return;
@@ -485,7 +491,11 @@ async function loadStatus() {
                 })[data.whatsappState] || 'Menunggu status WhatsApp…';
             }
         }
-    } catch(e) { }
+    } catch(e) {
+        document.getElementById('conn-text').textContent = 'Status gateway belum tersedia.';
+    } finally {
+        refreshingStatus = false;
+    }
 }
 
 async function loadConfig() {

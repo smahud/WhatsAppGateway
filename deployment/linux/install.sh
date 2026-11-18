@@ -190,7 +190,7 @@ install -m 600 -o "$SERVICE_USER" -g "$SERVICE_USER" "$STAGE/config.json" "$TARG
 if [[ $SOURCE == "$TARGET" ]]; then
  mv -- "$STAGE/node_modules" "$TARGET/node_modules"
 else
- (cd "$STAGE"; tar --exclude='config.json' -cf - .) | tar -C "$TARGET" -xf -
+ (cd "$STAGE"; tar --anchored --exclude='./config.json' -cf - .) | tar -C "$TARGET" -xf -
 fi
 chown -R "root:$SERVICE_USER" "$TARGET"; chmod -R o-rwx "$TARGET"; chmod 750 "$TARGET"
 install -d -m 700 -o "$SERVICE_USER" -g "$SERVICE_USER" "$TARGET/sessions"
