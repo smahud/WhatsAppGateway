@@ -123,7 +123,7 @@ if [[ ! -x $NODE ]] || ! "$NODE" -e 'const [m,n]=process.versions.node.split("."
  [[ -n $ARCHIVE ]] || die 'Cannot select official Node.js archive'
  curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --connect-timeout 15 --max-time 120 "https://nodejs.org/dist/latest-v22.x/$ARCHIVE" -o "$WORK/$ARCHIVE"
  (cd "$WORK"; awk -v file="$ARCHIVE" '$2 == file' SHASUMS256.txt | sha256sum --check -)
- tar -xJf "$WORK/$ARCHIVE" -C "$RUNTIME"
+ tar --no-same-owner -xJf "$WORK/$ARCHIVE" -C "$RUNTIME"
  [[ ! -e $RUNTIME/node || -L $RUNTIME/node ]] || die 'Runtime node path is not a managed symlink'
  ln -sfn "$RUNTIME/${ARCHIVE%.tar.xz}" "$RUNTIME/node"
 fi
