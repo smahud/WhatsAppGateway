@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shared by install/uninstall. New units can retain legacy data paths in place.
 GATEWAY=jibas-wg-gateway.service
 BRIDGE=jibas-wg-bridge.service

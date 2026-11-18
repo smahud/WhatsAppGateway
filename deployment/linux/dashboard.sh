@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Shared by the full installer and credential rotation.
 dashboard_credentials() (
  if ((USER_SET)); then export JIBAS_WG_LOGIN_USER="$LOGIN_USER"; else unset JIBAS_WG_LOGIN_USER; fi

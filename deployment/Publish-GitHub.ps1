@@ -48,8 +48,9 @@ try {
         GIT_CONFIG_COUNT='1';
         GIT_CONFIG_KEY_0='http.https://github.com/.extraheader';
         GIT_CONFIG_VALUE_0=('Authorization: Basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("x-access-token:$token")));
-        GIT_TERMINAL_PROMPT='0'; GIT_TRACE='0'; GIT_TRACE_CURL='0'; GIT_CURL_VERBOSE='0';
-        GIT_TRACE2='0'; GIT_TRACE2_EVENT='0'; GIT_TRACE2_PERF='0'; GIT_TRACE_PACKET='0'
+        GIT_TERMINAL_PROMPT='0'; GIT_TRACE=$null; GIT_TRACE_CURL=$null; GIT_CURL_VERBOSE=$null;
+        GIT_TRACE2=$null; GIT_TRACE2_EVENT=$null; GIT_TRACE2_PERF=$null; GIT_TRACE_PACKET=$null;
+        GIT_TRACE_REDACT='1'
     }
     foreach ($key in $envValues.Keys) {
         $saved[$key] = [Environment]::GetEnvironmentVariable($key,'Process')
