@@ -1,12 +1,37 @@
 # JIBAS WhatsApp Gateway (JIBAS WG)
 
-JIBAS WG mengirim pesan dari menu **SMS JIBAS** melalui WhatsApp. Instalasi normal selalu memasang integrasi JIBAS dan mengaktifkan MOVE: `jbssms.outbox` → worker → `jibas_wg.outbox` → WhatsApp. Cakupan: satu akun WhatsApp dan pesan teks keluar. Pesan masuk, webhook inbox, dan fitur SMS interaktif tidak digantikan.
+[![JIBAS WG Linux installer checks](https://github.com/smahud/WhatsAppGateway/actions/workflows/linux-installer.yml/badge.svg?branch=main)](https://github.com/smahud/WhatsAppGateway/actions/workflows/linux-installer.yml)
+
+JIBAS WG mengirim pesan dari menu **SMS JIBAS** melalui WhatsApp. Instalasi normal selalu memasang integrasi JIBAS dan mengaktifkan MOVE: `jbssms.outbox` → worker → `jibas_wg.outbox` → WhatsApp. Cakupan: satu akun WhatsApp dan pesan teks keluar. Pesan masuk, webhook inbox, OTA, bot, dan fitur SMS interaktif tidak digantikan.
+
+## Status proyek
+
+- Source `main` adalah source yang dipublikasikan. Riwayat audit, perbaikan, dan bukti pengujian ada di [AUDIT](deployment/AUDIT.md).
+- `npm test` tidak membutuhkan database atau WhatsApp. Workflow [Linux installer checks](https://github.com/smahud/WhatsAppGateway/actions/workflows/linux-installer.yml) menguji instalasi Ubuntu 24.04, systemd, Nginx HTTPS, migrasi, dan SQL pada runner disposable.
+- Cutover produksi belum dijalankan oleh repository ini. Service produksi dapat masih memakai versi lama; CI lulus bukan bukti bahwa VPS atau server Windows sudah diperbarui.
+- Pengujian end-to-end terakhir memakai MariaDB nyata dan socket WhatsApp tiruan. Pairing dan pengiriman WhatsApp nyata setelah rename harus diuji ulang pada perangkat tujuan.
+- Batas dan langkah cutover dijelaskan di [CONTRACT](CONTRACT.md#gerbang-produksi-dan-rollback).
+
+## Untuk agen dan kontributor
+
+Baca [CONTRACT.md](CONTRACT.md) sebelum mengubah kode. Dokumen tersebut memuat aturan wajib, peta repository, kontrak MOVE, matriks pengujian, definisi selesai, dan gerbang produksi.
+
+Aturan singkat:
+
+1. JIBAS wajib; jangan membuat mode standalone atau menambah fitur di luar teks keluar.
+2. Jangan mengubah `database: "wagw"` pada instalasi lama. Instalasi baru memakai `jibas_wg`.
+3. Jangan menjalankan installer, aktivasi, restart, atau pengiriman nyata terhadap produksi tanpa persetujuan eksplisit.
+4. Jangan commit `config.json`, `dashboard-auth.json`, `sessions/`, `.runtime/`, database, log, atau PAT.
+5. Gunakan DB/VM disposable untuk pengujian yang menulis data. `test-jibas-e2e.js` memakai socket WhatsApp tiruan, bukan pengiriman nyata.
+6. Push tanpa force melalui `deployment/Publish-GitHub.ps1 -AllowPublic`; installer tidak melakukan commit atau push.
+
+Peta singkat: `gateway.js` (dashboard dan pengiriman), `deployment/` (bridge, database, installer, test), `public/` (frontend), `create tables/` (schema JIBAS), dan `.github/workflows/` (CI Ubuntu).
 
 ## Sebelum memasang
 
 - Siapkan **JIBAS yang sudah berjalan**. `jbssms.outbox` harus InnoDB; database gateway dan `jbssms` harus berada di instance MySQL/MariaDB yang sama. Gunakan [akun database aplikasi](#akun-database-jibas).
 - Cadangkan DB/config/sesi dan hentikan consumer SMS lama sebelum mengaktifkan MOVE. Jika ada pesan lama yang belum tercatat oleh trigger, installer normal berhenti tanpa memindahkannya. Gunakan `--no-activate-move` untuk staging.
-- Untuk instalasi pertama: **clone atau unduh dan ekstrak ZIP → salin dan edit `config.json` → jalankan installer**. Node.js/dependensi disiapkan installer; tidak perlu menjalankan `npm ci` secara manual.
+- Untuk instalasi pertama: **clone atau unduh dan ekstrak ZIP → salin dan edit `config.json` → jalankan installer**. Node.js dan dependensi disiapkan installer; tidak perlu menjalankan `npm ci` secara manual.
 
 ## Windows
 
@@ -131,11 +156,24 @@ GRANT SELECT, DELETE, TRIGGER ON jbssms.outbox TO 'jibas_wg_app'@'127.0.0.1';
 
 Jangan impor dump `create tables/` ke database aktif; berkas asli mengandung `DROP TABLE`. Installer hanya memakai CREATE yang diperlukan, memasang trigger tanpa mengganti trigger berbeda, dan tidak menghapus riwayat `jbssms.outboxhistory`.
 
+## Verifikasi dan pengujian
+
+| Perintah | Cakupan |
+| --- | --- |
+| `npm test` | Unit/static: loading config, startup guard, auth, UI, deployment, dan konfigurasi Linux. Tidak menyentuh DB atau WhatsApp. |
+| `node deployment/test-bridge.js` | Transaksi capture/update, normalisasi, penjadwalan, rollback, deduplikasi, dan status pada DB disposable. |
+| `node deployment/test-jibas-e2e.js` | Trigger JIBAS asli + worker + gateway + dashboard dengan MariaDB nyata dan socket WhatsApp tiruan. Wajib memakai fixture bertanda dan tabel kosong. |
+| `npm audit --omit=dev` | Audit dependensi produksi dari lockfile. |
+| `deployment/Test-Windows-Fixture.ps1` / `Test-Windows-Service.ps1` | Installer Windows pada MariaDB disposable: port, repair, ACL, SCM, migrasi, dan uninstall. |
+| `deployment/linux/test-ports.sh`, `test-nginx.sh`, `test-systemd.sh` | Keputusan port, HTTPS/login/CSRF, dan instalasi systemd penuh pada runner disposable. |
+
+Detail prasyarat dan perintah fixture ada di [CONTRACT](CONTRACT.md#matriks-verifikasi). Jangan menjalankan fixture pada database produksi. Pengujian dengan socket tiruan tidak membuktikan pairing, pengiriman, atau penerimaan di HP.
+
 ## Referensi dan diagnosa
 
 - [Windows](deployment/WINDOWS.md): status service, log, dan perbaikan.
 - [Linux](deployment/VPS.md): akses VPS, HTTPS, dan journal systemd.
-- [Alur dan batas JIBAS](deployment/OUTBOX.md), [kontrak](CONTRACT.md), dan [audit](deployment/AUDIT.md).
+- [Alur dan batas JIBAS](deployment/OUTBOX.md), [kontrak kerja](CONTRACT.md), dan [audit](deployment/AUDIT.md).
 - Windows `daemon/logs/`; Linux `sudo journalctl -u jibas-wg-gateway -u jibas-wg-bridge -n 60 --no-pager`.
 
 Paket source Windows/Linux tanpa kredensial, sesi, atau runtime dapat dibangun dengan:
