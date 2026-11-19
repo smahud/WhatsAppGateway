@@ -3,6 +3,23 @@ $JibasEntry = Join-Path $JibasRoot 'deployment\start-gateway.js'
 $JibasServiceName = 'JIBAS_WG.exe'
 $JibasLegacyServiceName = 'wagwpro.exe'
 $JibasLegacyTask = 'WAGW-JIBAS-Bridge'
+$JibasWindowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+
+function Invoke-JibasNativeProcess([string]$FilePath, [string[]]$ArgumentList) {
+    # Windows PowerShell 5.1 drops embedded quotes when calling native commands.
+    # Apply Windows argv quoting so credential values reach the child unchanged.
+    $quoted = foreach ($argument in $ArgumentList) {
+        '"' + ($argument -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
+    }
+    $info = [Diagnostics.ProcessStartInfo]::new()
+    $info.FileName = $FilePath
+    $info.Arguments = $quoted -join ' '
+    $info.WorkingDirectory = (Get-Location -PSProvider FileSystem).ProviderPath
+    $info.UseShellExecute = $false
+    $process = [Diagnostics.Process]::Start($info)
+    try { $process.WaitForExit(); return $process.ExitCode }
+    finally { $process.Dispose() }
+}
 
 function Get-JibasNode {
     $portable = Join-Path $JibasRoot 'node.exe'

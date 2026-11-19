@@ -25,13 +25,13 @@ $oldPath = $env:PATH
 $oldGit = $env:NPM_CONFIG_GIT
 $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$PSHOME"
 $env:NPM_CONFIG_GIT = 'C:\not-installed\git.exe'
-$installer = Join-Path $stage 'Install_to_Windows_Service.bat'
-$uninstaller = Join-Path $stage 'Uninstall_Windows_Service.bat'
+$installer = Join-Path $stage 'Install-Windows-Service.ps1'
+$uninstaller = Join-Path $stage 'Uninstall-Windows-Service.ps1'
 $healthUrl = "http://127.0.0.1:$port"
 
 function Install-Fixture {
     $ErrorActionPreference = 'Continue'
-    $output = & $installer @args 2>&1
+    $output = & $psExe -NoProfile -ExecutionPolicy Bypass -File $installer @args 2>&1
     return @{ExitCode=$LASTEXITCODE;Text=($output -join "`n")}
 }
 
@@ -67,8 +67,14 @@ try {
     New-Item -ItemType Directory -Path $stage | Out-Null
     & icacls.exe $stage /inheritance:r /grant:r '*S-1-5-32-544:(OI)(CI)F' '*S-1-5-18:(OI)(CI)F' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Could not protect fixture config.' }
-    foreach ($file in @('Install_to_Windows_Service.bat','Install_Service.js','Uninstall_Windows_Service.bat','gateway.js','wabot.js','package.json','package-lock.json')) {
+    foreach ($file in @('Install-Windows-Service.ps1','Install_Service.js','Uninstall-Windows-Service.ps1','gateway.js','wabot.js','package.json','package-lock.json')) {
         Copy-Item -LiteralPath (Join-Path $JibasRoot $file) -Destination $stage
+    }
+    foreach ($entry in @($installer,$uninstaller)) {
+        $helpText = & $psExe -NoProfile -ExecutionPolicy Bypass -File $entry -Help
+        if ($LASTEXITCODE -ne 0 -or ($helpText -join "`n") -notmatch 'JIBAS WhatsApp Gateway') {
+            throw "Help failed without Node/config: $entry"
+        }
     }
     foreach ($directory in @('public','create tables')) {
         Copy-Item -LiteralPath (Join-Path $JibasRoot $directory) -Destination $stage -Recurse
@@ -120,7 +126,7 @@ try {
     $legacyXml.service.name = 'Legacy fixture ' + $stamp
     $legacyXml.service.arguments = $legacyXml.service.arguments.Replace('start-gateway.js','start-wagw.js')
     $legacyXml.Save([IO.Path]::ChangeExtension($legacy,'.xml'))
-    & $uninstaller
+    & $psExe -NoProfile -ExecutionPolicy Bypass -File $uninstaller
     if ($LASTEXITCODE -ne 0) { throw 'Could not unregister fresh fixture before migration test.' }
     $registered = Invoke-CimMethod -ClassName Win32_Service -MethodName Create -Arguments @{
         Name=$legacyName; DisplayName=("Legacy fixture $stamp"); PathName=('"'+$legacy+'"')
@@ -147,16 +153,23 @@ try {
     if ($upgraded.pid -eq $legacyHealth.pid -or !(Test-Path -LiteralPath $sessionProbe)) { throw 'Legacy process or session preservation check failed.' }
     Verify-Login 'admin' $originalPassword $true
 
-    $passFile = Join-Path $stage 'fixture rotated.pass'
-    Set-Content -LiteralPath $passFile -Value 'Fixture second password' -Encoding UTF8
-    $rotation = Install-Fixture --credentials-only --user operator --pass-file $passFile
-    if ($rotation.ExitCode -ne 0) { throw $rotation.Text }
+    Push-Location -LiteralPath $stage
+    try {
+        $passFile = '.\fixture rotated.pass'
+        Set-Content -LiteralPath $passFile -Value 'Fixture second password' -Encoding UTF8
+        & $installer -CredentialsOnly -User operator -PassFile $passFile
+        if ($LASTEXITCODE -ne 0) { throw 'Credential rotation using a relative password file failed.' }
+    } finally { Pop-Location }
     Verify-Login 'admin' $originalPassword $false
     Verify-Login 'operator' 'Fixture second password' $true
+    $quotedPass = 'Fixture "quoted" %&! with trailing slash\'
+    & $installer -CredentialsOnly -User operator -Pass $quotedPass
+    if ($LASTEXITCODE -ne 0) { throw 'PowerShell credential rotation with special characters failed.' }
+    Verify-Login 'operator' $quotedPass $true
     if ((Get-JibasHealth $port).pid -ne $upgraded.pid) { throw 'Credential rotation restarted the gateway.' }
     & (Join-Path $stage '.runtime\node\node.exe') (Join-Path $stagedDeployment 'test-bridge.js')
     if ($LASTEXITCODE -ne 0) { throw 'Transactional JIBAS fixture failed.' }
-    & $uninstaller
+    & $psExe -NoProfile -ExecutionPolicy Bypass -File $uninstaller
     if ($LASTEXITCODE -ne 0 -or (Get-JibasScm $name) -or @(Get-JibasPortOwners $port).Count -gt 0) { throw 'Uninstall did not release the service/socket.' }
     foreach ($file in @('config.json','dashboard-auth.json','sessions','daemon\logs')) {
         if (!(Test-Path -LiteralPath (Join-Path $stage $file))) { throw "Uninstall removed data: $file" }

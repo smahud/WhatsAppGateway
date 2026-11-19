@@ -30,8 +30,8 @@ Peta singkat: `gateway.js` (dashboard dan pengiriman), `deployment/` (bridge, da
 ## Sebelum memasang
 
 - Siapkan **JIBAS yang sudah berjalan**. `jbssms.outbox` harus InnoDB; database gateway dan `jbssms` harus berada di instance MySQL/MariaDB yang sama. Gunakan [akun database aplikasi](#akun-database-jibas).
-- Cadangkan DB/config/sesi dan hentikan consumer SMS lama sebelum mengaktifkan MOVE. Jika ada pesan lama yang belum tercatat oleh trigger, installer normal berhenti tanpa memindahkannya. Gunakan `--no-activate-move` untuk staging.
-- Untuk instalasi pertama: **clone atau unduh dan ekstrak ZIP → salin dan edit `config.json` → jalankan installer**. Node.js dan dependensi disiapkan installer; tidak perlu menjalankan `npm ci` secara manual.
+- Cadangkan DB/config/sesi dan hentikan consumer SMS lama sebelum mengaktifkan MOVE. Jika ada pesan lama yang belum tercatat oleh trigger, installer normal berhenti tanpa memindahkannya. Gunakan `-NoActivateMove` (Windows) atau `--no-activate-move` (Linux) untuk staging.
+- Untuk instalasi pertama: **clone atau unduh dan ekstrak ZIP → salin dan edit `config.json` → jalankan installer**. Node.js dan dependensi disiapkan installer; tidak perlu menjalankan `npm ci` secara manual. Untuk upgrade Windows, gunakan [folder instalasi yang sama](#upgrade-dari-instalasi-lama).
 
 ## Windows
 
@@ -50,16 +50,14 @@ Isi `host`, `db_port`, `user`, dan `password` sesuai **database JIBAS**. Untuk i
 ```powershell
 .\Install-Windows-Service.ps1
 # atau jika kebijakan script dibatasi:
-powershell -ExecutionPolicy Bypass -File .\Install-Windows-Service.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-Windows-Service.ps1
 ```
-
-> **Catatan:** File `.bat` lama (`Install_to_Windows_Service.bat`) tetap tersedia sebagai wrapper kompatibilitas untuk pengguna yang terbiasa klik-dua-kali dari Explorer, namun script utama adalah `.ps1`.
 
 Jika pemasangan pertama tanpa opsi login, installer mencetak `admin` dan password acak **sekali** di terminal. Simpan password tersebut. Buka **http://127.0.0.1:3000/login** (ganti port jika diubah). Setelah login berhasil, aplikasi membuka dashboard. Dashboard Windows hanya tersedia di localhost.
 
 ```powershell
 # Install/repair dan tetapkan login baru:
-.\Install-Windows-Service.ps1 -User admin -Pass "GANTI_DENGAN_PASSWORD_KUAT"
+.\Install-Windows-Service.ps1 -User admin -PassFile "C:\Private\jibas-wg.pass"
 
 # Staging JIBAS: pasang trigger tetapi jangan pindahkan antrean baru:
 .\Install-Windows-Service.ps1 -NoActivateMove
@@ -70,6 +68,8 @@ Jika pemasangan pertama tanpa opsi login, installer mencetak `admin` dan passwor
 # Lepas Windows Service; tidak menghapus konfigurasi, login, sesi, atau data:
 .\Uninstall-Windows-Service.ps1
 ```
+
+Gunakan `-Help` untuk melihat opsi skrip PowerShell tanpa memasang atau melepas service.
 
 ## Ubuntu/Debian
 
@@ -110,18 +110,18 @@ sudo bash uninstall.sh
 | Opsi login | Instalasi baru | Instalasi yang sudah ada |
 | --- | --- | --- |
 | Tidak ada | `admin` + password acak | Pertahankan username dan password yang tersimpan |
-| `--user NAMA` | NAMA + password acak | Ganti username dan buat password acak baru |
-| `--pass …` atau `--pass-file PATH` | `admin` + password pilihan | Pertahankan username; ganti password |
-| `--user` dan `--pass`/`--pass-file` | Gunakan keduanya | Ganti keduanya |
+| Windows `-User NAMA` / Linux `--user NAMA` | NAMA + password acak | Ganti username dan buat password acak baru |
+| Windows `-Pass`/`-PassFile` / Linux `--pass`/`--pass-file` | `admin` + password pilihan | Pertahankan username; ganti password |
+| Username dan opsi password | Gunakan keduanya | Ganti keduanya |
 
-`--pass-file` menggunakan file privat UTF-8 satu baris dan menghindari password di shell history. Mengganti login memutus sesi dashboard lama, **bukan** sesi WhatsApp. Autentikasi berjalan melalui halaman `/login`, bukan dialog Basic Auth browser. Pengguna Linux lama dengan login Nginx bcrypt dapat menjalankan installer normal tanpa opsi login untuk memindahkan login lama.
+`-PassFile` (Windows) dan `--pass-file` (Linux) menggunakan file privat UTF-8 satu baris dan menghindari password di shell history. Mengganti login memutus sesi dashboard lama, **bukan** sesi WhatsApp. Autentikasi berjalan melalui halaman `/login`, bukan dialog Basic Auth browser. Pengguna Linux lama dengan login Nginx bcrypt dapat menjalankan installer normal tanpa opsi login untuk memindahkan login lama.
 
 **Jika port dipakai aplikasi lain**, installer berhenti sebelum pemasangan runtime/dependensi. Ubah `port` di `config.json` (bukan `db_port`), lalu jalankan ulang. Di Linux boleh memakai `--port`. **Jika port milik instalasi gateway yang sama**, installer memeriksa kepemilikan port dan DB, lalu melakukan restart terkontrol. Config, kredensial, sesi, dan antrean dipertahankan.
 
 ### Upgrade dari instalasi lama
 
 - **Jangan ganti `database: "wagw"` pada konfigurasi lama.** Ini adalah nama schema kompatibilitas, bukan nama aplikasi. Installer menjaga schema, trigger, dan antrean lama; tidak membuat jalur MOVE kedua.
-- **Windows:** perbarui source di folder instalasi lama tanpa menimpa `config.json`, `dashboard-auth.json`, atau `sessions/`. Rerun installer di folder yang sama untuk mengganti registrasi yang terverifikasi dari `wagwpro.exe` menjadi `JIBAS_WG.exe`.
+- **Windows:** perbarui source di folder instalasi lama tanpa menimpa `config.json`, `dashboard-auth.json`, atau `sessions/`. Gunakan [panduan migrasi di tempat](deployment/WINDOWS.md#upgrade-di-folder-yang-sama): file batch installer/uninstaller lama tidak lagi diperlukan, tetapi service `wagwpro.exe` yang masih terdaftar jangan dilepas secara manual. Jalankan installer PowerShell untuk migrasi registrasi yang terverifikasi ke `JIBAS_WG.exe`.
 - **Linux:** jalankan installer baru dari checkout/ZIP. Jika sudah terpasang di `/opt/wagw`, biarkan data di lokasi itu; unit dan konfigurasi Nginx diperbarui ke nama JIBAS WG. Gunakan `config.json` lama, atau biarkan installer memakai config terpasang. Lihat [panduan VPS](deployment/VPS.md#repair-rotasi-dan-uninstall).
 
 ## Cara pakai dari JIBAS
@@ -130,7 +130,7 @@ sudo bash uninstall.sh
 2. Pastikan worker siap, MOVE aktif, dan WhatsApp terhubung. Kirim satu pesan teks dari **menu SMS JIBAS** ke nomor tester yang mengizinkan pengujian. Menu uji langsung di dashboard bukan pengujian alur JIBAS.
 3. Pantau Outbox dan Sent. Pesan terjadwal baru berpindah pada waktunya. `sent` berarti library melaporkan pengiriman berhasil, bukan bukti pesan diterima atau dibaca. Konfirmasi di perangkat tujuan.
 
-Jika instalasi ditahan karena antrean lama, gunakan staging `--no-activate-move`, lihat `uncaptured` pada `doctor.js`, lalu tinjau pesan bersama operator JIBAS. Setelah consumer SMS lama dihentikan dan antrean direkonsiliasi:
+Jika instalasi ditahan karena antrean lama, gunakan staging `-NoActivateMove` (Windows) atau `--no-activate-move` (Linux), lihat `uncaptured` pada `doctor.js`, lalu tinjau pesan bersama operator JIBAS. Setelah consumer SMS lama dihentikan dan antrean direkonsiliasi:
 
 ```powershell
 # Windows: gunakan node portable jika ada; jika tidak, pakai runtime installer.

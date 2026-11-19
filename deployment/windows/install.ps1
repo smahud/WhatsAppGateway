@@ -5,10 +5,9 @@ $options = @($args)
 $manager = Join-Path $PSScriptRoot 'manage-service.ps1'
 $installer = Join-Path $JibasRoot 'Install_Service.js'
 $runtime = Join-Path $JibasRoot '.runtime'
-$ps = Join-Path $PSHOME 'powershell.exe'
 
 function Invoke-Manager([string]$Action) {
-    & $ps -NoProfile -ExecutionPolicy Bypass -File $manager -Action $Action
+    & $JibasWindowsPowerShell -NoProfile -ExecutionPolicy Bypass -File $manager -Action $Action
     if ($LASTEXITCODE -ne 0) { throw "Instalasi dihentikan pada tahap $Action (lihat pesan di atas)." }
 }
 
@@ -59,17 +58,14 @@ function Get-NodeBundle {
 
 try {
     if ($options -contains '--help' -or $options -contains '-h') {
-        $node = Get-JibasNode
-        if ($node) { & $node $installer --help; exit $LASTEXITCODE }
-        Write-Output 'JIBAS WhatsApp Gateway - Install-Windows-Service.ps1 [-User NAME] [-Pass PASSWORD | -PassFile PATH] [-CredentialsOnly | -NoActivateMove]'
+        Write-Output 'JIBAS WhatsApp Gateway - gunakan .\Install-Windows-Service.ps1 -Help.'
         exit 0
     }
     Assert-JibasAdmin
     if ($options -contains '--credentials-only') {
         $node = Get-JibasNode
         if (!$node) { throw 'Pasang JIBAS WG sebelum mengubah login dashboard.' }
-        & $node $installer @options
-        exit $LASTEXITCODE
+        exit (Invoke-JibasNativeProcess $node (@($installer) + $options))
     }
     Invoke-Manager 'Preflight'
     Invoke-Manager 'Protect'
@@ -108,8 +104,8 @@ try {
     }
     $env:JIBAS_WG_INSTALL_PHASE = 'check'
     if ($pending) { $env:NODE_PATH = Join-Path $pending 'node_modules' }
-    & $node $installer @options
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $check = Invoke-JibasNativeProcess $node (@($installer) + $options)
+    if ($check -ne 0) { exit $check }
     Invoke-Manager 'RepairStop'
     if ($pending) {
         if (Test-Path -LiteralPath $tree) {
@@ -120,8 +116,7 @@ try {
         Remove-Item Env:NODE_PATH -ErrorAction SilentlyContinue
     }
     $env:JIBAS_WG_INSTALL_PHASE = 'apply'
-    & $node $installer @options
-    exit $LASTEXITCODE
+    exit (Invoke-JibasNativeProcess $node (@($installer) + $options))
 } catch {
     [Console]::Error.WriteLine($_.Exception.Message)
     exit 1

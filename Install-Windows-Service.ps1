@@ -1,65 +1,65 @@
 <#
 .SYNOPSIS
-    JIBAS WhatsApp Gateway - Script Instalasi Windows Service (PowerShell Native)
+    Pasang atau perbaiki layanan Windows JIBAS WhatsApp Gateway.
 .DESCRIPTION
-    Menggantikan Install_to_Windows_Service.bat sebagai entry-point utama instalasi
-    JIBAS WhatsApp Gateway di Windows. Script ini:
-    - Memverifikasi hak Administrator (auto-elevate jika perlu)
-    - Memvalidasi lokasi folder (memperingatkan jika di bawah profil pengguna)
-    - Meneruskan argumen ke deployment\windows\install.ps1
+    Instalasi normal memasang integrasi JIBAS dan mengaktifkan MOVE.
+    Hentikan consumer SMS lama dan tinjau antrean sebelum cutover.
+    Pada pemasangan pertama tanpa opsi login, simpan password admin yang dicetak sekali.
+.PARAMETER User
+    Username dashboard. Jika hanya User diisi, password baru dibuat otomatis.
+.PARAMETER Pass
+    Password dashboard. Gunakan PassFile agar password tidak masuk riwayat shell.
+.PARAMETER PassFile
+    Path file privat UTF-8 berisi satu baris password dashboard.
+.PARAMETER CredentialsOnly
+    Ubah login dashboard tanpa mengubah database atau me-restart layanan.
+.PARAMETER NoActivateMove
+    Pasang integrasi JIBAS dengan MOVE dijeda.
+.PARAMETER PauseOutbox
+    Jeda MOVE dan jangan kirim pesan dari antrean gateway dalam proses ini.
+.PARAMETER DbOnly
+    Diagnostik schema JIBAS yang sudah siap, tanpa mengubah DB atau menghubungkan WhatsApp.
+.PARAMETER Help
+    Tampilkan bantuan tanpa menjalankan instalasi.
 .NOTES
     Jalankan dari PowerShell Administrator:
       .\Install-Windows-Service.ps1
     Atau jika kebijakan script dibatasi:
-      powershell -ExecutionPolicy Bypass -File .\Install-Windows-Service.ps1
+      powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install-Windows-Service.ps1
 #>
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding=$false)]
 param(
-    [Parameter(Mandatory=$false)][string]$User,
-    [Parameter(Mandatory=$false)][string]$Pass,
-    [Parameter(Mandatory=$false)][string]$PassFile,
-    [Parameter(Mandatory=$false)][switch]$CredentialsOnly,
-    [Parameter(Mandatory=$false)][switch]$NoActivateMove,
-    [Parameter(Mandatory=$false)][switch]$PauseOutbox,
-    [Parameter(Mandatory=$false)][switch]$DbOnly,
-    [Parameter(Mandatory=$false)][switch]$Help
+    [ValidateNotNullOrEmpty()][string]$User,
+    [ValidateNotNullOrEmpty()][string]$Pass,
+    [ValidateNotNullOrEmpty()][string]$PassFile,
+    [switch]$CredentialsOnly,
+    [switch]$NoActivateMove,
+    [switch]$PauseOutbox,
+    [switch]$DbOnly,
+    [switch]$Help
 )
 
 $ErrorActionPreference = 'Stop'
 
-# --- Auto-Elevation: deteksi dan elevasi jika bukan Administrator ---
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
-    [Security.Principal.WindowsBuiltInRole]::Administrator
-)
-if (-not $isAdmin) {
-    Write-Warning "Skrip ini memerlukan hak Administrator untuk mendaftarkan Windows Service."
-    Write-Host "Membuka sesi PowerShell Administrator baru..." -ForegroundColor Cyan
-    $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
-    if ($User)             { $argList += " -User `"$User`"" }
-    if ($Pass)             { $argList += " -Pass `"$Pass`"" }
-    if ($PassFile)         { $argList += " -PassFile `"$PassFile`"" }
-    if ($CredentialsOnly)  { $argList += " -CredentialsOnly" }
-    if ($NoActivateMove)   { $argList += " -NoActivateMove" }
-    if ($PauseOutbox)      { $argList += " -PauseOutbox" }
-    if ($DbOnly)           { $argList += " -DbOnly" }
-    if ($Help)             { $argList += " -Help" }
-    Start-Process powershell.exe -ArgumentList $argList -Verb RunAs
-    exit
+if ($Help) {
+    Get-Help $PSCommandPath -Detailed
+    exit 0
 }
 
-# --- Validasi lokasi folder: peringatan jika di bawah profil pengguna ---
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+. (Join-Path $PSScriptRoot 'deployment\windows\common.ps1')
+# Keep the one-time login password visible in the operator's own terminal.
+Assert-JibasAdmin
+
 $profileRoot = (Split-Path -Parent $env:USERPROFILE).TrimEnd('\') + '\'
-if ($scriptDir.StartsWith($profileRoot, [StringComparison]::OrdinalIgnoreCase)) {
+if ($PSScriptRoot.StartsWith($profileRoot, [StringComparison]::OrdinalIgnoreCase)) {
     Write-Warning @"
-PERINGATAN: Folder proyek berada di dalam profil pengguna ($scriptDir).
+Folder proyek berada di dalam profil pengguna ($PSScriptRoot).
 Service Windows berjalan sebagai NT AUTHORITY\LocalService dan TIDAK DAPAT
 mengakses folder di bawah C:\Users\<nama>. Sangat disarankan untuk memindahkan
 proyek ke folder khusus seperti C:\JIBAS_WG sebelum melanjutkan.
 "@
 }
 
-# --- Bangun argumen untuk diteruskan ke deployment\windows\install.ps1 ---
 $forwardArgs = @()
 if ($User)             { $forwardArgs += '--user', $User }
 if ($Pass)             { $forwardArgs += '--pass', $Pass }
@@ -68,13 +68,12 @@ if ($CredentialsOnly)  { $forwardArgs += '--credentials-only' }
 if ($NoActivateMove)   { $forwardArgs += '--no-activate-move' }
 if ($PauseOutbox)      { $forwardArgs += '--pause-outbox' }
 if ($DbOnly)           { $forwardArgs += '--db-only' }
-if ($Help)             { $forwardArgs += '--help' }
 
-# --- Jalankan installer inti ---
-$installScript = Join-Path $scriptDir 'deployment\windows\install.ps1'
+$installScript = Join-Path $PSScriptRoot 'deployment\windows\install.ps1'
 if (-not (Test-Path -LiteralPath $installScript -PathType Leaf)) {
     throw "Script installer tidak ditemukan: $installScript"
 }
 
-& "$PSHOME\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $installScript @forwardArgs
-exit $LASTEXITCODE
+exit (Invoke-JibasNativeProcess $JibasWindowsPowerShell (@(
+    '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $installScript
+) + $forwardArgs))

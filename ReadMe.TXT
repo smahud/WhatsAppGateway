@@ -4,18 +4,18 @@ JIBAS WHATSAPP GATEWAY (JIBAS WG)
 2. Salin config.example.json menjadi config.json, lalu isi data MariaDB/MySQL
    JIBAS. jibas_wg dan jbssms harus pada instance yang sama. port adalah port
    dashboard; db_port adalah port database.
-3. Jalankan Install-Windows-Service.ps1 dari PowerShell Administrator
-   (atau Install_to_Windows_Service.bat untuk kompatibilitas klik-dua-kali)
+3. Jalankan .\Install-Windows-Service.ps1 dari PowerShell Administrator
    atau sudo bash install.sh pada Ubuntu/Debian. Installer juga memperbaiki
    service gateway yang sudah memakai port tersebut. Jika port dipakai aplikasi
    lain, ubah port di config.json.
 4. Install pertama tanpa argumen mencetak login admin dan password acak.
-   Akses /login dulu, lalu dashboard. Ganti login via --user, --pass,
-   atau --pass-file; --credentials-only tidak me-restart layanan.
+   Akses /login dulu. Untuk ganti login tanpa restart, pakai -CredentialsOnly
+   dengan -User, -Pass, atau -PassFile (Windows), atau --credentials-only
+   dengan --user, --pass, atau --pass-file (Linux).
 5. Tautkan WhatsApp dan kirim melalui menu SMS JIBAS. Jika antrean lama
-   belum direkonsiliasi, gunakan --no-activate-move untuk staging.
-6. Uninstall: Uninstall-Windows-Service.ps1 (atau Uninstall_Windows_Service.bat)
-   atau sudo bash uninstall.sh.
+   belum direkonsiliasi, gunakan -NoActivateMove (Windows) atau
+   --no-activate-move (Linux) untuk staging.
+6. Uninstall: .\Uninstall-Windows-Service.ps1 atau sudo bash uninstall.sh.
    Config, akun dashboard, sesi, antrean, dan trigger JIBAS tetap ada.
 
 Perintah lengkap dan prasyarat ada di README.md.

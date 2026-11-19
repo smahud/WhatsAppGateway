@@ -5,7 +5,7 @@ $stage = Join-Path $dist ('stage-' + [guid]::NewGuid().ToString('N'))
 $archive = Join-Path $dist ('jibas-wg-source-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.zip')
 $top = @('install.sh','uninstall.sh','gateway.js','wabot.js','package.json','package-lock.json','config.example.json','README.md',
     'CONTRACT.md','tutorial.html','ReadMe.TXT','.gitignore','.gitattributes',
-    'Install_to_Windows_Service.bat','Uninstall_Windows_Service.bat','Install_Service.js')
+    'Install-Windows-Service.ps1','Uninstall-Windows-Service.ps1','Install_Service.js')
 try {
     New-Item -ItemType Directory -Path $stage -Force | Out-Null
     foreach ($name in $top) {

@@ -37,7 +37,7 @@ Dokumen ini adalah acuan operasional untuk agen otomatis, kontributor, dan opera
 1. **Jangan membuat instalasi tanpa JIBAS.** Launcher dan installer harus menolak konfigurasi yang tidak memiliki `jbssms.outbox`, trigger, dan schema gateway yang valid.
 2. **Jangan mengubah `database: "wagw"` pada instalasi lama.** Nama itu adalah identitas kompatibilitas, bukan nama aplikasi. Mengubahnya dapat membuat antrean lama tidak terlihat.
 3. **Pertahankan identifier legacy yang masih diperlukan upgrade:** schema `wagw`, lock `wagw-gateway` dan `wagw-jibas-bridge`, kolom `wagw_id`, trigger `wagw_*`, path `/opt/wagw`, unit lama, serta registrasi service `wagwpro.exe`. Rename hanya untuk identitas yang terlihat pengguna dan instalasi baru.
-4. **Jangan menyentuh produksi tanpa izin.** Termasuk `Install-Windows-Service.ps1`, `Install_to_Windows_Service.bat`, `install.sh`, `uninstall.sh`, `deploy.js`, `activate.js`, `pause.js`, restart service, perubahan trigger, dan pengiriman pesan nyata.
+4. **Jangan menyentuh produksi tanpa izin.** Termasuk `Install-Windows-Service.ps1`, `Uninstall-Windows-Service.ps1`, `install.sh`, `uninstall.sh`, `deploy.js`, `activate.js`, `pause.js`, restart service, perubahan trigger, dan pengiriman pesan nyata.
 5. **Jangan commit data sensitif.** `config.json`, `dashboard-auth.json`, `sessions/`, `.runtime/`, `node_modules/`, database, log, PID, backup, sertifikat, password, dan PAT tidak boleh masuk Git. Gunakan `deployment/Build-Release.ps1` untuk paket source.
 6. **Jangan menambah fitur di luar scope** tanpa persetujuan dan pengujian tersendiri. Jalur OTA, webhook/bot, inbox, dan pesan masuk sudah dihapus dari alur utama.
 7. **Jangan menjanjikan exactly-once delivery.** Transaksi database dan referensi ID mencegah duplikasi enqueue, tetapi crash antara pengiriman jaringan dan pencatatan SQL tetap dapat menimbulkan pesan ganda atau tidak tercatat.
@@ -50,7 +50,8 @@ Dokumen ini adalah acuan operasional untuk agen otomatis, kontributor, dan opera
 | Path | Tanggung jawab |
 | --- | --- |
 | `gateway.js` | Aplikasi dashboard Express, autentikasi, endpoint QR/status, dan pengiriman WhatsApp. |
-| `wabot.js` | Shim kompatibilitas untuk service lama yang masih menunjuk ke file ini. |
+| `wabot.js`, `deployment/start-wagw.js`, `deployment/supervisor.js` | Shim kompatibilitas untuk registrasi service/task lama; bukan entry point instalasi baru. |
+| `deployment/linux/pause.js` | Shim kompatibilitas untuk unit Linux lama yang masih memanggil path ini. |
 | `deployment/start-gateway.js` | Preflight DB/trigger, named lock, pemilihan worker, dan lifecycle proses. |
 | `deployment/bridge.js` | Worker MOVE `jbssms.outbox` ke antrean gateway dan rekonsiliasi hasil. |
 | `deployment/database.js` | Koneksi, validasi schema/trigger, cutover, lock, dan status bridge. |
@@ -59,8 +60,7 @@ Dokumen ini adalah acuan operasional untuk agen otomatis, kontributor, dan opera
 | `deployment/deploy.js` | Bootstrap schema, migrasi `sent.status`, pemasangan trigger, dan aktivasi MOVE. |
 | `deployment/move.js`, `activate.js`, `pause.js`, `doctor.js` | Kontrol MOVE, diagnosa antrean, dan aktivasi setelah cutover. |
 | `deployment/dashboard-auth.js`, `dashboard-credentials.js`, `login.html` | Login form, cookie server-side, hash scrypt/bcrypt, dan rotasi kredensial. |
-| `Install-Windows-Service.ps1`, `Uninstall-Windows-Service.ps1` | Script PowerShell native untuk install dan uninstall service Windows (menggantikan `.bat` sebagai entry-point utama). |
-| `Install_to_Windows_Service.bat`, `Uninstall_Windows_Service.bat` | Wrapper kompatibilitas `.bat` untuk klik-dua-kali dari Explorer; meneruskan ke script `.ps1`. |
+| `Install-Windows-Service.ps1`, `Uninstall-Windows-Service.ps1` | Entry point PowerShell untuk install dan uninstall service Windows; keduanya tersedia di ZIP source. |
 | `deployment/windows/` | Installer, proteksi ACL, registrasi SCM `JIBAS_WG.exe`, migrasi, repair, dan uninstall. |
 | `deployment/linux/` | Installer systemd, Nginx HTTPS, port ownership, migrasi `/opt/wagw`, service, dan uninstall. |
 | `public/` | Dashboard dan aset frontend. |
@@ -116,23 +116,23 @@ Tidak ada retry jaringan otomatis maupun penerjemahan `sent` menjadi delivery re
 
 ## Instalasi, login, dan data
 
-Installer membaca koneksi dan port dashboard dari `config.json`, yang disiapkan dari `config.example.json`. `--user` dan `--pass`/`--pass-file` mengatur login dashboard, bukan akun database.
+Installer membaca koneksi dan port dashboard dari `config.json`, yang disiapkan dari `config.example.json`. Opsi `-User` dan `-Pass`/`-PassFile` (Windows) atau `--user` dan `--pass`/`--pass-file` (Linux) mengatur login dashboard, bukan akun database.
 
 | Opsi login | Instalasi baru | Instalasi yang sudah ada |
 | --- | --- | --- |
 | Tidak ada | `admin` + password acak, dicetak sekali | Pertahankan username/password tersimpan |
-| `--user NAMA` | NAMA + password acak | Ganti username dan buat password acak baru |
-| `--pass …` atau `--pass-file PATH` | `admin` + password pilihan | Pertahankan username; ganti password |
-| `--user` dan `--pass`/`--pass-file` | Gunakan keduanya | Ganti keduanya |
+| Username saja | NAMA + password acak | Ganti username dan buat password acak baru |
+| Password saja, langsung atau lewat file | `admin` + password pilihan | Pertahankan username; ganti password |
+| Username dan password | Gunakan keduanya | Ganti keduanya |
 
-- `--pass-file` memakai file privat UTF-8 satu baris untuk menghindari password di shell history.
+- `-PassFile` (Windows) atau `--pass-file` (Linux) memakai file privat UTF-8 satu baris untuk menghindari password di shell history.
 - Login melalui halaman `/login` dan cookie server-side, bukan Basic Auth browser. Pengguna Linux lama dengan Nginx bcrypt dimigrasikan saat repair.
 - Mengganti login memutus sesi dashboard lama, bukan sesi WhatsApp.
-- `--credentials-only` tidak mengubah database dan tidak me-restart service.
+- `-CredentialsOnly` (Windows) atau `--credentials-only` (Linux) tidak mengubah database dan tidak me-restart service.
 - Windows: dashboard hanya loopback; installer memproteksi ACL folder dan menjalankan service `JIBAS_WG.exe` sebagai `LocalService`.
 - Linux: dashboard HTTPS melalui Nginx; backend tetap loopback. Runtime berada di `/opt/jibas-wg-runtime`, aplikasi di `/opt/jibas-wg`, dan state TLS di `/etc/jibas-wg`.
 - Port dashboard diperiksa sebelum bootstrap. Listener asing ditolak; listener milik instalasi gateway yang terverifikasi boleh diperbaiki.
-- Instalasi normal memasang trigger dan mengaktifkan MOVE. Gunakan `--no-activate-move` untuk staging.
+- Instalasi normal memasang trigger dan mengaktifkan MOVE. Gunakan `-NoActivateMove` (Windows) atau `--no-activate-move` (Linux) untuk staging.
 - Installer tidak menghapus pesan, tidak memutar ulang antrean lama, dan tidak membuat database JIBAS dari nol.
 - Uninstall mempertahankan database, config, login, sesi WhatsApp, antrean, dan trigger JIBAS.
 
@@ -176,7 +176,7 @@ Cutover produksi adalah tindakan operator, bukan bagian dari CI. Jangan mengakti
 2. Hentikan consumer SMS lama. Pastikan tidak ada proses lain yang mengambil `jbssms.outbox`.
 3. Jalankan `deployment/doctor.js`. Untuk instalasi baru, gunakan runtime Node yang sesuai; `uncaptured` harus `0` dan `cutoverReady` harus `true`.
 4. Jika `uncaptured` bukan nol, **jangan** replay atau hapus massal. Tinjau pesan bersama operator JIBAS dan rekonsiliasi secara manual.
-5. Untuk staging, pasang dengan `--no-activate-move`, periksa `bridge_outgoing`, lalu aktifkan dengan `deployment/activate.js` setelah antrean bersih.
+5. Untuk staging, pasang dengan `-NoActivateMove` (Windows) atau `--no-activate-move` (Linux), periksa `bridge_outgoing`, lalu aktifkan dengan `deployment/activate.js` setelah antrean bersih.
 6. Restart/reboot service, periksa login, `/healthz`, worker, MOVE, dan status WhatsApp.
 7. Kirim **satu pesan teks dari menu SMS JIBAS** ke nomor tester yang disetujui. Konfirmasi penerimaan di perangkat tujuan; jangan memakai tombol uji langsung dashboard sebagai bukti alur JIBAS.
 8. Pantau Outbox, Sent, dan `bridge_outgoing`. Hentikan cutover bila ada duplikasi, penolakan tak terduga, atau worker tidak siap.

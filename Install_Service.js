@@ -98,7 +98,7 @@ Jalankan instalasi service sebagai Administrator. Dashboard Windows hanya di loc
     planCredentials(credentials);
     return checkDeployment({activateMove,diagnostic});
   }
-  if (phase !== 'apply') throw new Error('Jalankan Install_to_Windows_Service.bat untuk bootstrap dan pengecekan port.');
+  if (phase !== 'apply') throw new Error('Jalankan Install-Windows-Service.ps1 untuk bootstrap dan pengecekan port.');
   if (!diagnostic) await deploy({activateMove});
   setCredentials(credentials);
   service('Install', flags);

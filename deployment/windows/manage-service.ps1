@@ -142,7 +142,7 @@ try {
             exit 0
         }
         foreach ($item in $services) { Remove-JibasRegistration $item }
-        Write-Output 'Service JIBAS WG dihapus. Config, kredensial, sesi, dan log dipertahankan.'
+        Write-Output 'Service JIBAS WG dihapus. Database, antrean, trigger, config, login, sesi, dan log dipertahankan.'
         exit 0
     }
 
@@ -187,7 +187,7 @@ try {
     if (!(Test-Path -LiteralPath $winSW -PathType Leaf)) {
         throw 'WinSW tidak ditemukan. Jalankan npm ci dengan optional dependency node-windows.'
     }
-    if (!(Test-Path -LiteralPath $credential -PathType Leaf)) { throw 'Siapkan login dashboard dengan Install_to_Windows_Service.bat terlebih dahulu.' }
+    if (!(Test-Path -LiteralPath $credential -PathType Leaf)) { throw 'Siapkan login dashboard dengan Install-Windows-Service.ps1 terlebih dahulu.' }
     $paths = @($JibasRoot, $NodeExe, (Join-Path $JibasRoot 'gateway.js'), (Join-Path $JibasRoot 'deployment'),
         $JibasEntry, (Join-Path $JibasRoot 'node_modules'), $winSW, $credential)
     foreach ($item in $paths) { Assert-JibasProtected $item }
