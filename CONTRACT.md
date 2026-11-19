@@ -64,7 +64,7 @@ Dokumen ini adalah acuan operasional untuk agen otomatis, kontributor, dan opera
 | `deployment/windows/` | Installer, proteksi ACL, registrasi SCM `JIBAS_WG.exe`, migrasi, repair, dan uninstall. |
 | `deployment/linux/` | Installer systemd, Nginx HTTPS, port ownership, migrasi `/opt/wagw`, service, dan uninstall. |
 | `public/` | Dashboard dan aset frontend. |
-| `create tables/` | Dump schema asli JIBAS. Hanya installer yang boleh mengekstrak `CREATE TABLE`; dump utuh mengandung `DROP TABLE` dan tidak boleh dijalankan manual pada data aktif. |
+| `create tables/` | Dump schema JIBAS MySQL/MariaDB. Hanya installer yang boleh mengekstrak `CREATE TABLE`; dump utuh mengandung `DROP TABLE` dan tidak boleh dijalankan manual pada data aktif. |
 | `deployment/test-*.js`, `deployment/*Fixture*.ps1`, `deployment/linux/test-*.sh` | Test tanpa produksi dan fixture disposable. |
 | `.github/workflows/linux-installer.yml` | Validasi Ubuntu 24.04, systemd, Nginx, migrasi, dan SQL. |
 

@@ -9,10 +9,9 @@ const settings = require('./settings');
 const {config: jibasConfig} = require('./database');
 const { redactSessionLogs } = require('./session-logs');
 const source = fs.readFileSync(path.join(settings.root, 'gateway.js'), 'utf8');
-const expected = {mysql:['mysql2/promise'], oracle:['oracledb'], sqlserver:['mssql'], sqlite:['sqlite3','sqlite'], odbc:['odbc']};
-const drivers = Object.values(expected).flat();
+const drivers = ['mysql2/promise'];
 
-function harness(type, blocked = []) {
+function harness(type) {
   const loaded = new Set();
   const routes = {};
   const socketEvents = [];
@@ -46,15 +45,7 @@ function harness(type, blocked = []) {
     'mysql2/promise':{
       createPool:opts=>{mysqlOptions.push(opts);return pool;},
       createConnection:async opts=>{mysqlOptions.push(opts);return connection;}
-    },
-    oracledb:{createPool:async()=>pool},
-    mssql:{connect:async()=>pool, ConnectionPool:class {
-      async connect() {}
-      async close(){closed++;}
-    }},
-    sqlite3:{Database:class Database{}},
-    sqlite:{open:async()=>pool},
-    odbc:{pool:async()=>pool}
+    }
   };
   const app = {use(route,fn){if(Array.isArray(route))for(const entry of route)routes[entry]=fn;},get(route,fn){routes[route]=fn;},post(route,fn){for(const entry of [route].flat())routes[entry]=fn;}};
   const express = Object.assign(()=>app,{json:()=>()=>{},static:()=>()=>{}});
@@ -64,7 +55,6 @@ function harness(type, blocked = []) {
     setTimeout(fn){timers.add(fn);return fn;}, clearTimeout(fn){timers.delete(fn);},
     require(name){
       if(drivers.includes(name)) {
-        if(blocked.includes(name)) throw Error('Driver intentionally absent: '+name);
         loaded.add(name);return mocks[name];
       }
       if(name==='express')return express;
@@ -108,18 +98,16 @@ function harness(type, blocked = []) {
 }
 
 (async()=>{
-  for(const type of Object.keys(expected)) {
-    const h=harness(type,drivers.filter(d=>!expected[type].includes(d)));
-    assert.equal(h.loaded.size,0,'No DB driver should load at module startup');
-    await h.run('initDatabase()');
-    assert.equal(h.run('isDbConnected'),true);
-    assert.deepEqual([...h.loaded].sort(),[...expected[type]].sort());
-    const test=harness('mysql',drivers.filter(d=>!expected[type].includes(d)));
-    const response=await test.call('/api/test-db',{db_type:type,host:'test-host'});
-    assert.equal(response.success,true,'Test connection failed for '+type);
-    assert.deepEqual([...test.loaded].sort(),[...expected[type]].sort());
-    assert.equal(test.closed(),1,'Temporary test connection must close');
-  }
+  const h=harness('mysql');
+  assert.equal(h.loaded.size,0,'No DB driver should load at module startup');
+  await h.run('initDatabase()');
+  assert.equal(h.run('isDbConnected'),true);
+  assert.deepEqual([...h.loaded].sort(),[...drivers].sort());
+  const test=harness('mysql');
+  const response=await test.call('/api/test-db',{db_type:'mysql',host:'test-host'});
+  assert.equal(response.success,true,'Test connection failed for MySQL');
+  assert.deepEqual([...test.loaded].sort(),[...drivers].sort());
+  assert.equal(test.closed(),1,'Temporary test connection must close');
 
   const mysql=harness('mysql');
   await mysql.run('initDatabase()');
@@ -185,5 +173,5 @@ function harness(type, blocked = []) {
   logger.info('Closing session:',{privateMaterial:'do not log'});
   logger.warn('A normal warning');
   assert.deepEqual(written,[['A normal warning']]);
-  console.log('PASS: DB ports, enforced JIBAS config and worker readiness, protected queue history, single WhatsApp socket/scheduler, and legacy driver coverage.');
+  console.log('PASS: MySQL-only loading, DB ports, enforced JIBAS config and worker readiness, protected queue history, and single WhatsApp socket/scheduler.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

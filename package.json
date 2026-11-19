@@ -24,11 +24,6 @@
     "test": "node deployment/test-db-loading.js && node deployment/test-deployment.js && node deployment/test-dashboard-auth.js && node deployment/test-dashboard-ui.js && node deployment/test-linux-install.js"
   },
   "optionalDependencies": {
-    "mssql": "^12.3.0",
-    "node-windows": "^1.0.0-beta.8",
-    "odbc": "^2.5.0",
-    "oracledb": "^6.10.0",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^6.0.1"
+    "node-windows": "^1.0.0-beta.8"
   }
 }

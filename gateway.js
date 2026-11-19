@@ -29,14 +29,9 @@ app.use(["/api/check-update", "/api/apply-update", "/api/update-baileys"], (_req
 app.use(express.json({ limit: "50mb" }));
 app.use("/", express.static(path.join(__dirname, "public")));
 
-let dbType = "mysql";
 let mysqlPool;
 let mysqlTimezone;
 const mysqlConnections = new WeakSet();
-let oraclePool;
-let mssqlPool;
-let odbcPool;
-let sqliteDb;
 let activeConfig;
 let sentStatusWidth = Infinity;
 
@@ -75,62 +70,15 @@ async function useMysqlConnection(operation) {
 }
 
 async function initDatabase(config = loadConfig()) {
-    dbType = readDbType(config);
+    readDbType(config);
     try {
-        if (dbType === "mysql") {
-            const mysql = require("mysql2/promise");
-            const opts = mysqlOptions(config);
-            mysqlTimezone = opts.timezone;
-            mysqlPool = mysql.createPool(opts);
-            await useMysqlConnection(c => c.query("SELECT 1"));
-            console.log("✅ Terhubung ke MySQL");
-        } else if (dbType === "oracle") {
-            const oracledb = require("oracledb");
-            oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
-            oracledb.autoCommit = true;
-            oraclePool = await oracledb.createPool({
-                user: config.user,
-                password: config.password || "",
-                connectString: `${config.host}/${config.database}`
-            });
-            isDbConnected = true;
-            console.log("✅ Terhubung ke Oracle");
-        } else if (dbType === "sqlserver") {
-            const mssql = require("mssql");
-            mssqlPool = await mssql.connect({
-                user: config.user,
-                password: config.password || "",
-                server: config.host,
-                database: config.database,
-                options: { encrypt: false, trustServerCertificate: true }
-            });
-            isDbConnected = true;
-            console.log("✅ Terhubung ke SQL Server");
-        } else if (dbType === "odbc") {
-            // Untuk ODBC, masukkan Connection String utuh ke kolom 'Host'
-            const odbc = require("odbc");
-            odbcPool = await odbc.pool(config.host);
-            isDbConnected = true;
-            console.log("✅ Terhubung ke ODBC");
-        } else if (dbType === "sqlite") {
-            const sqlite3 = require("sqlite3");
-            const { open } = require("sqlite");
-            sqliteDb = await open({
-                filename: path.join(__dirname, 'wg.sqlite'),
-                driver: sqlite3.Database
-            });
-            // Automatically execute Create Tables if tables do not exist
-            const tableCheck = await sqliteDb.get("SELECT name FROM sqlite_master WHERE type='table' AND name='outbox'");
-            if (!tableCheck) {
-                console.log("⏳ Mengunggah Schema SQLite (Membuat Tabel)...");
-                const schemaPath = path.join(__dirname, 'create tables', 'Create Tables - SQLLITE.sql');
-                await sqliteDb.exec(fs.readFileSync(schemaPath, 'utf8'));
-                console.log("✅ Schema SQLite berhasil dibuat.");
-            }
-            isDbConnected = true;
-            console.log("✅ Terhubung ke SQLite (Lokal wg.sqlite)");
-        }
+        const mysql = require("mysql2/promise");
+        const opts = mysqlOptions(config);
+        mysqlTimezone = opts.timezone;
+        mysqlPool = mysql.createPool(opts);
+        await useMysqlConnection(c => c.query("SELECT 1"));
         isDbConnected = true;
+        console.log("✅ Terhubung ke MySQL");
     } catch (e) {
         await closeDatabase().catch(() => {});
         throw e;
@@ -139,66 +87,21 @@ async function initDatabase(config = loadConfig()) {
 
 async function closeDatabase() {
     isDbConnected = false;
-    if (mysqlPool) {
-        const pool = mysqlPool;
-        mysqlPool = undefined;
-        await pool.end();
-    } else if (oraclePool) {
-        await oraclePool.close();
-    } else if (mssqlPool) {
-        await mssqlPool.close();
-    } else if (odbcPool) {
-        await odbcPool.close();
-    } else if (sqliteDb) {
-        await sqliteDb.close();
-    }
+    if (!mysqlPool) return;
+    const pool = mysqlPool;
+    mysqlPool = undefined;
+    await pool.end();
 }
 
-// Universal Query function
+// JIBAS always runs on MySQL/MariaDB so queue transactions stay atomic.
 async function queryDB(sql, params = []) {
     try {
-        if (dbType === "mysql") {
-            const [rows] = await useMysqlConnection(c => c.execute(sql, params));
-            isDbConnected = true;
-            return rows;
-        } else if (dbType === "oracle") {
-            // Oracle uses :1, :2, :3 instead of ?
-            let orcSql = sql;
-            let pId = 1;
-            while(orcSql.includes("?")) {
-                orcSql = orcSql.replace("?", `:${pId}`);
-                pId++;
-            }
-            const result = await oraclePool.execute(orcSql, params);
-            return result.rows || [];
-        } else if (dbType === "sqlserver") {
-            // mssql uses @p1, @p2, etc.
-            let sqlSrvSql = sql;
-            let pId = 1;
-            const request = mssqlPool.request();
-            while(sqlSrvSql.includes("?")) {
-                let pName = `p${pId}`;
-                sqlSrvSql = sqlSrvSql.replace("?", `@${pName}`);
-                request.input(pName, params[pId-1]);
-                pId++;
-            }
-            const result = await request.query(sqlSrvSql);
-            return result.recordset || [];
-        } else if (dbType === "odbc") {
-            const result = await odbcPool.query(sql, params);
-            return result || [];
-        } else if (dbType === "sqlite") {
-            if (!sqliteDb) throw new Error("SQLite disconnected");
-            if (sql.trim().toUpperCase().startsWith("SELECT")) {
-                 return await sqliteDb.all(sql, params);
-            } else {
-                 await sqliteDb.run(sql, params);
-                 return [];
-            }
-        }
+        const [rows] = await useMysqlConnection(c => c.execute(sql, params));
+        isDbConnected = true;
+        return rows;
     } catch (e) {
         console.error("Gagal menjankan kueri DB:", e.message);
-        if (dbType === 'mysql' && /^(PROTOCOL_|ECONN|ETIMEDOUT|EPIPE|EHOST|ENET)/.test(e.code || '')) isDbConnected = false;
+        if (/^(PROTOCOL_|ECONN|ETIMEDOUT|EPIPE|EHOST|ENET)/.test(e.code || '')) isDbConnected = false;
         throw e;
     }
 }
@@ -309,11 +212,11 @@ function configCandidate(saved, fields = {}) {
     }
     if (getJibasStatus && candidate.database !== saved.database) throw Error("Schema gateway tidak dapat diganti dari dashboard.");
     candidate.db_type = readDbType(candidate);
-    if (candidate.db_type === "mysql") candidate.db_port = port(candidate.db_port, 3306, "db_port");
+    candidate.db_port = port(candidate.db_port, 3306, "db_port");
     // Do not forward a saved password to a different server, port or login.
-    const sameLogin = candidate.db_type === readDbType(saved) &&
+    const sameLogin = readDbType(saved) === candidate.db_type &&
         candidate.host === saved.host && candidate.user === saved.user &&
-        (candidate.db_type !== "mysql" || candidate.db_port === port(saved.db_port, 3306, "db_port"));
+        candidate.db_port === port(saved.db_port, 3306, "db_port");
     if (!sameLogin && !Object.hasOwn(fields, "password")) candidate.password = "";
     if (Object.hasOwn(fields, "delay")) {
         const delay = Number(fields.delay);
@@ -325,8 +228,7 @@ function configCandidate(saved, fields = {}) {
 
 function dbConfigChanged(before, after) {
     return databaseKeys.some(key => {
-        if (key === "db_port") return after.db_type === "mysql" && Number(before.db_port ?? 3306) !== after.db_port;
-        if (key === "db_type") return readDbType(before) !== after.db_type;
+        if (key === "db_port") return Number(before.db_port ?? 3306) !== after.db_port;
         return (before[key] ?? "") !== (after[key] ?? "");
     });
 }
@@ -343,46 +245,13 @@ async function testDatabase(config) {
         }
         return;
     }
-    switch (readDbType(config)) {
-        case "mysql": {
-            const mysql = require("mysql2/promise");
-            const options = mysqlOptions(config);
-            const connection = await mysql.createConnection(options);
-            try {
-                await connection.query("SET SESSION time_zone=?", [options.timezone]);
-            } finally {
-                await connection.end();
-            }
-            break;
-        }
-        case "oracle": {
-            const oracledb = require("oracledb");
-            const pool = await oracledb.createPool({
-                user: config.user, password: config.password || "", connectString: `${config.host}/${config.database}`
-            });
-            await pool.close();
-            break;
-        }
-        case "sqlserver": {
-            const mssql = require("mssql");
-            const pool = new mssql.ConnectionPool({
-                user: config.user, password: config.password || "", server: config.host, database: config.database,
-                options: { encrypt: false, trustServerCertificate: true }
-            });
-            try { await pool.connect(); } finally { await pool.close(); }
-            break;
-        }
-        case "odbc": {
-            const pool = await require("odbc").pool(config.host);
-            await pool.close();
-            break;
-        }
-        case "sqlite": {
-            const sqlite3 = require("sqlite3");
-            const db = await require("sqlite").open({ filename: path.join(__dirname, "wg.sqlite"), driver: sqlite3.Database });
-            await db.close();
-            break;
-        }
+    const mysql = require("mysql2/promise");
+    const options = mysqlOptions(config);
+    const connection = await mysql.createConnection(options);
+    try {
+        await connection.query("SET SESSION time_zone=?", [options.timezone]);
+    } finally {
+        await connection.end();
     }
 }
 
@@ -401,7 +270,7 @@ app.post("/api/test-db", async (req, res) => {
         await testDatabase(config);
         return res.json({success: true, message: getJibasStatus
             ? "Koneksi MySQL/MariaDB dan schema bridge JIBAS berhasil diperiksa."
-            : `Koneksi ${config.db_type.toUpperCase()} berhasil.`});
+            : "Koneksi MySQL/MariaDB berhasil."});
     } catch(e) {
         return res.json({success: false, error: e.message});
     }
@@ -483,25 +352,22 @@ app.post("/api/logout", async (req, res) => {
 
 app.get("/api/inbox", async (req, res) => {
     try {
-        // limit fetching to 100 on dashboard
-        const rows = await queryDB("SELECT * FROM inbox ORDER BY id DESC" + (dbType === "mysql" ? " LIMIT 100" : ""));
-        // Oracle gives rows but since we do limit, it lacks standard limit if not written specifically
-        // To be safe and cross database compatible, we just return all or handle on client if many
-        res.json(rows.slice(0, 100)); // slice for safety
+        const rows = await queryDB("SELECT * FROM inbox ORDER BY id DESC LIMIT 100");
+        res.json(rows);
     } catch(e){ res.status(500).json({error: e.message}); }
 });
 
 app.get("/api/outbox", async (req, res) => {
     try {
-        const rows = await queryDB("SELECT * FROM outbox ORDER BY id DESC" + (dbType === "mysql" ? " LIMIT 100" : ""));
-        res.json(rows.slice(0, 100));
+        const rows = await queryDB("SELECT * FROM outbox ORDER BY id DESC LIMIT 100");
+        res.json(rows);
     } catch(e){ res.status(500).json({error: e.message}); }
 });
 
 app.get("/api/sent", async (req, res) => {
     try {
-        const rows = await queryDB("SELECT * FROM sent ORDER BY wa_time DESC" + (dbType === "mysql" ? " LIMIT 100" : ""));
-        res.json(rows.slice(0, 100));
+        const rows = await queryDB("SELECT * FROM sent ORDER BY wa_time DESC LIMIT 100");
+        res.json(rows);
     } catch(e){ res.status(500).json({error: e.message}); }
 });
 
@@ -581,13 +447,9 @@ app.post("/api/send-bulk", async (req, res) => {
     try { entries = messages.map(message => testMessage(message, filterOnline === true)); }
     catch (err) { return res.status(400).json({error: err.message}); }
     try {
-        if (dbType === "mysql") {
-            // Validate the whole batch before enqueueing; the MySQL batch is one statement.
-            const placeholders = entries.map(() => "(?, ?)").join(", ");
-            await queryDB(`INSERT INTO outbox (wa_no, wa_text) VALUES ${placeholders}`, entries.flat());
-        } else {
-            for (const entry of entries) await queryDB("INSERT INTO outbox (wa_no, wa_text) VALUES (?, ?)", entry);
-        }
+        // Validate the whole batch before enqueueing; the MySQL batch is one statement.
+        const placeholders = entries.map(() => "(?, ?)").join(", ");
+        await queryDB(`INSERT INTO outbox (wa_no, wa_text) VALUES ${placeholders}`, entries.flat());
         res.json({ success: true, message: `${entries.length} pesan berhasil dimasukkan ke antrean outbox.` });
     } catch(e) {
         res.status(500).json({error: e.message});
@@ -673,26 +535,21 @@ async function recordOutbox(id, number, text, media, file, status) {
     const insert = "INSERT INTO sent (id, wa_mode, wa_no, wa_text, wa_media, wa_file, wa_time, status) VALUES (?, NULL, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)";
     const params = [id, number, text || "", media || null, file || null, status];
     const remove = "DELETE FROM outbox WHERE id = ?";
-    if (dbType === "mysql") {
-        await useMysqlConnection(async connection => {
-            await connection.beginTransaction();
-            try {
-                // If a previous COMMIT succeeded but its reply was lost, do not insert twice.
-                const [[pending]] = await connection.execute("SELECT id FROM outbox WHERE id = ? FOR UPDATE", [id]);
-                if (pending) {
-                    await connection.execute(insert, params);
-                    await connection.execute(remove, [id]);
-                }
-                await connection.commit();
-            } catch (err) {
-                await connection.rollback().catch(() => {});
-                throw err;
+    await useMysqlConnection(async connection => {
+        await connection.beginTransaction();
+        try {
+            // If a previous COMMIT succeeded but its reply was lost, do not insert twice.
+            const [[pending]] = await connection.execute("SELECT id FROM outbox WHERE id = ? FOR UPDATE", [id]);
+            if (pending) {
+                await connection.execute(insert, params);
+                await connection.execute(remove, [id]);
             }
-        });
-    } else {
-        await queryDB(insert, params);
-        await queryDB(remove, [id]);
-    }
+            await connection.commit();
+        } catch (err) {
+            await connection.rollback().catch(() => {});
+            throw err;
+        }
+    });
     return status;
 }
 
@@ -709,19 +566,14 @@ async function loopOutbox(onlyId) {
         if (pendingReceipt) return await persistReceipt(...pendingReceipt);
         if (!isReady) return;
         const rows = onlyId === undefined
-            ? await queryDB("SELECT * FROM outbox ORDER BY id" + (dbType === "mysql" ? " LIMIT 1" : ""))
+            ? await queryDB("SELECT * FROM outbox ORDER BY id LIMIT 1")
             : await queryDB("SELECT * FROM outbox WHERE id = ?", [onlyId]);
 
         if (isReady && rows && rows.length > 0) {
             const row = rows[0];
-            const { id, wa_no, wa_text, wa_media, wa_file } = row;
-            // Uppercase variants for Oracle compatibility (Oracle sometimes returns keys in uppercase)
-            const idVal = row.id || row.ID;
-            const waNoVal = wa_no || row.WA_NO;
-            let waTextVal = wa_text || row.WA_TEXT;
+            const { id: idVal, wa_no: waNoVal, wa_media: waMediaVal, wa_file: waFileVal } = row;
+            let waTextVal = row.wa_text;
             if (waTextVal) waTextVal = waTextVal.replace(/~r/g, "\n").replace(/<br>/gi, "\n");
-            const waMediaVal = wa_media || row.WA_MEDIA;
-            const waFileVal = wa_file || row.WA_FILE;
 
             const jid = waNoVal.includes("@") ? waNoVal : `${waNoVal}@s.whatsapp.net`;
 

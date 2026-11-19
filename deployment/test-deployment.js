@@ -84,6 +84,6 @@ function startupHarness({connect,assertRuntime,assertCutover=async()=>{},workerR
  assert.equal(mysqlOptions({host:'localhost',database:'wagw',user:'fixture',db_port:'33445'}).port,33445);
  assert.equal(mysqlOptions({host:'localhost',database:'wagw',user:'fixture'}).port,3306);
  for(const bad of [0,false,'',3.5,65536])assert.throws(()=>port(bad,3306,'db_port'),/db_port/);
- for(const name of ['odbc','oracledb','mssql','sqlite3'])assert(!Object.keys(require.cache).some(p=>p.includes(path.sep+name+path.sep)));
+ for(const name of ['odbc','oracledb','mssql','sqlite3'])assert(!Object.keys(require.cache).some(p=>p.includes(path.sep+name+path.sep)),'Legacy driver must not load: '+name);
  console.log('PASS: default JIBAS worker, required schema, maintenance/systemd ownership, old-row cutover refusal, trigger drift and DB port validation.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

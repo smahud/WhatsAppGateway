@@ -47,10 +47,9 @@ function port(value, fallback, key) {
 }
 
 function dbType(cfg) {
-  const type = String(cfg.db_type || 'sqlite').toLowerCase();
-  if (!['mysql', 'oracle', 'sqlserver', 'odbc', 'sqlite'].includes(type)) {
-    throw new Error('db_type tidak didukung');
-  }
+  // JIBAS integration always uses the MySQL/MariaDB instance that holds jbssms.
+  const type = String(cfg.db_type || 'mysql').toLowerCase();
+  if (type !== 'mysql') throw new Error('JIBAS membutuhkan db_type=mysql');
   return type;
 }
 

@@ -6,6 +6,7 @@
 | --- | --- |
 | Identitas | Dashboard, login, pairing, paket npm/ZIP, serta nama layanan baru memakai JIBAS WhatsApp Gateway. Upgrade mempertahankan path data lama, hash login dan schema lama. |
 | Dependensi | Perbarui Baileys, Express, mysql2, dan dependensi transitif sesuai lockfile. Instalasi npm tidak memerlukan Git untuk libsignal. `npm audit --omit=dev` tidak melaporkan kerentanan pada lockfile ini saat audit. |
+| Cakupan database | Driver dan dump schema Oracle, SQL Server, ODBC, serta SQLite yang tidak dipakai dihapus. Gateway dan dashboard hanya menerima MySQL/MariaDB; `db_type` lain ditolak sebelum koneksi. |
 | Dashboard | Login form dan cookie server-side diuji untuk redirect, password lama bcrypt/scrypt, rotasi, logout, dan Origin. QR dirender lokal, diperbarui otomatis, dan membutuhkan login. Uji langsung dibatasi ke teks; jalur OTA dan webhook/bot bawaan yang bukan bagian dari MOVE dihapus. |
 | Database | Bootstrap tidak mengimpor `DROP TABLE`; read-only preflight menolak antrean lama, trigger berbeda, dan schema bersaing. Uji SQL mencakup capture/update, penjadwalan, invalid, sumber hilang, rollback DELETE, deduplikasi antrean, dan pencatatan hasil. Schema legacy juga diuji dengan grant pengguna aplikasi dari README. |
 | Keutuhan kiriman | Retry penulisan receipt dalam proses yang sama tidak mengirim ulang; hasil INSERT dan penghapusan outbox dicatat dalam satu transaksi MySQL. Batas crash antar sistem tetap berlaku. |
